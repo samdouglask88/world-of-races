@@ -16,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import com.example.worldofraces.client.gui.DialogueScreen;
 import com.example.worldofraces.util.NameGenerator;
 import com.example.worldofraces.family.FamilyData;
+import com.example.worldofraces.family.FamilyRegistry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -26,8 +27,21 @@ public class RaceEntity extends PathfinderMob {
 
     public RaceEntity(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
-        String randomName = NameGenerator.generateRandomFullName();
-        this.setCustomName(Component.literal(randomName));
+        
+        boolean isMale = this.random.nextBoolean();
+        boolean isNoble = this.random.nextInt(100) < 20;
+        
+        String firstName = NameGenerator.generateFirstName(isMale);
+        String fullName;
+        
+        if (isNoble) {
+            String surname = FamilyRegistry.getOrCreateNobleFamily().getSurname();
+            fullName = firstName + " " + surname;
+        } else {
+            fullName = firstName;
+        }
+        
+        this.setCustomName(Component.literal(fullName));
         this.setCustomNameVisible(true);
     }
 
