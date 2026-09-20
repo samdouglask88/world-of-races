@@ -37,8 +37,10 @@ public class DialogueScreen extends Screen {
         int top = (this.height - HEIGHT) / 2;
 
         guiGraphics.fill(left, top, left + WIDTH, top + HEIGHT, 0xCC000000);
-        guiGraphics.drawCenteredString(this.font, "Ola, viajante!", this.width / 2, top + 15, 0xFFFFFF);
-        guiGraphics.drawCenteredString(this.font, "Eu sou um NPC da raca humana.", this.width / 2, top + 35, 0xFFFFFF);
+
+        String npcName = this.npc.getName().getString();
+        guiGraphics.drawCenteredString(this.font, npcName, this.width / 2, top + 15, 0xFFFFFF);
+        guiGraphics.drawCenteredString(this.font, "Ola, viajante!", this.width / 2, top + 35, 0xFFFFFF);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
