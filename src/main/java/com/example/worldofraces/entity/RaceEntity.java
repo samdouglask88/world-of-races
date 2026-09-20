@@ -14,11 +14,16 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.client.Minecraft;
 import com.example.worldofraces.client.gui.DialogueScreen;
+import com.example.worldofraces.util.NameGenerator;
+import net.minecraft.network.chat.Component;
 
 public class RaceEntity extends PathfinderMob {
 
     public RaceEntity(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
+        String randomName = NameGenerator.generateRandomFullName();
+        this.setCustomName(Component.literal(randomName));
+        this.setCustomNameVisible(true);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
