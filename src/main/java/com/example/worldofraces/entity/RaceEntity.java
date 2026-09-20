@@ -17,10 +17,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.entity.Mob;
 
 public class RaceEntity extends PathfinderMob {
 
@@ -69,7 +69,20 @@ public class RaceEntity extends PathfinderMob {
             net.minecraft.world.entity.player.Player player,
             net.minecraft.world.InteractionHand hand) {
 
-        if (this.level().isClientSide) {
+        if (!this.level().isClientSide) {
+            String fatherInfo = this.familyData.getFatherId() != null
+                    ? this.familyData.getFatherId().toString() : "nenhum";
+            String motherInfo = this.familyData.getMotherId() != null
+                    ? this.familyData.getMotherId().toString() : "nenhuma";
+            int childrenCount = this.familyData.getChildrenIds().size();
+
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                    "[DEBUG] " + this.getName().getString() +
+                    " | Pai: " + fatherInfo +
+                    " | Mae: " + motherInfo +
+                    " | Filhos: " + childrenCount
+            ));
+        } else {
             net.minecraft.client.Minecraft.getInstance().setScreen(
                     new com.example.worldofraces.client.gui.DialogueScreen(this)
             );
