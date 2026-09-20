@@ -1,7 +1,12 @@
 package com.example.worldofraces.entity;
 
+import com.example.worldofraces.family.FamilyData;
+import com.example.worldofraces.family.FamilyRegistry;
+import com.example.worldofraces.util.NameGenerator;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
@@ -10,43 +15,38 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.client.Minecraft;
-import com.example.worldofraces.client.gui.DialogueScreen;
-import com.example.worldofraces.util.NameGenerator;
-import com.example.worldofraces.family.FamilyData;
-import com.example.worldofraces.family.FamilyRegistry;
-import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.DifficultyInstance;
 
 public class RaceEntity extends PathfinderMob {
 
     private final FamilyData familyData = new FamilyData();
+    private boolean isMale;
+    private String noblesurname;
 
     public RaceEntity(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
-        
-        boolean isMale = this.random.nextBoolean();
+
+        this.isMale = this.random.nextBoolean();
         boolean isNoble = this.random.nextInt(100) < 20;
-        
-        String firstName = NameGenerator.generateFirstName(isMale);
+
+        String firstName = NameGenerator.generateFirstName(this.isMale);
         String fullName;
-        
+
         if (isNoble) {
-            String surname = FamilyRegistry.getOrCreateNobleFamily().getSurname();
-            fullName = firstName + " " + surname;
+            this.noblesurname = FamilyRegistry.getOrCreateNobleFamily().getSurname();
+            fullName = firstName + " " + this.noblesurname;
         } else {
+            this.noblesurname = null;
             fullName = firstName;
         }
-        
-        this.setCustomName(Component.literal(fullName));
-        this.setCustomNameVisible(true);
-    }
 
-    public com.example.worldofraces.family.FamilyData getFamilyData() {
-        return familyData;
+        this.setCustomName(net.minecraft.network.chat.Component.literal(fullName));
+        this.setCustomNameVisible(true);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -62,6 +62,23 @@ public class RaceEntity extends PathfinderMob {
         this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+    }
+
+    @Override
+    protected net.minecraft.world.InteractionResult mobInteract(
+            net.minecraft.world.entity.player.Player player,
+            net.minecraft.world.InteractionHand hand) {
+
+        if (this.level().isClientSide) {
+            net.minecraft.client.Minecraft.getInstance().setScreen(
+                    new com.example.worldofraces.client.gui.DialogueScreen(this)
+            );
+        }
+        return net.minecraft.world.InteractionResult.sidedSuccess(this.level().isClientSide);
+    }
+
+    public FamilyData getFamilyData() {
+        return familyData;
     }
 
     @Override
@@ -83,6 +100,11 @@ public class RaceEntity extends PathfinderMob {
             childrenList.add(childTag);
         }
         tag.put("Children", childrenList);
+
+        if (this.noblesurname != null) {
+            tag.putString("NobleSurname", this.noblesurname);
+        }
+        tag.putBoolean("IsMale", this.isMale);
     }
 
     @Override
@@ -102,13 +124,48 @@ public class RaceEntity extends PathfinderMob {
             CompoundTag childTag = childrenList.getCompound(i);
             familyData.addChild(childTag.getUUID("Id"));
         }
+
+        if (tag.contains("NobleSurname")) {
+            this.noblesurname = tag.getString("NobleSurname");
+        } else {
+            this.noblesurname = null;
+        }
+        if (tag.contains("IsMale")) {
+            this.isMale = tag.getBoolean("IsMale");
+        }
     }
 
     @Override
-    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
-        if (this.level().isClientSide) {
-            Minecraft.getInstance().setScreen(new DialogueScreen(this));
+    public SpawnGroupData finalizeSpawn(
+            ServerLevelAccessor level,
+            DifficultyInstance difficulty,
+            MobSpawnType spawnType,
+            SpawnGroupData spawnData,
+            CompoundTag dataTag) {
+
+        if (this.noblesurname != null && level instanceof ServerLevel serverLevel) {
+            java.util.List<RaceEntity> nearby = serverLevel.getEntitiesOfClass(
+                    RaceEntity.class,
+                    this.getBoundingBox().inflate(200.0D),
+                    other -> other != this && this.noblesurname.equals(other.noblesurname)
+            );
+
+            if (!nearby.isEmpty()) {
+                RaceEntity relative = nearby.get(0);
+                if (this.isMale) {
+                    if (!relative.isMale) {
+                        this.familyData.setMotherId(relative.getUUID());
+                        relative.familyData.addChild(this.getUUID());
+                    }
+                } else {
+                    if (relative.isMale) {
+                        this.familyData.setFatherId(relative.getUUID());
+                        relative.familyData.addChild(this.getUUID());
+                    }
+                }
+            }
         }
-        return InteractionResult.sidedSuccess(this.level().isClientSide);
+
+        return super.finalizeSpawn(level, difficulty, spawnType, spawnData, dataTag);
     }
 }
