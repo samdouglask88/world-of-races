@@ -10,6 +10,10 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.client.Minecraft;
+import com.example.worldofraces.client.gui.DialogueScreen;
 
 public class RaceEntity extends PathfinderMob {
 
@@ -30,5 +34,13 @@ public class RaceEntity extends PathfinderMob {
         this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+    }
+
+    @Override
+    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (this.level().isClientSide) {
+            Minecraft.getInstance().setScreen(new DialogueScreen(this));
+        }
+        return InteractionResult.sidedSuccess(this.level().isClientSide);
     }
 }
