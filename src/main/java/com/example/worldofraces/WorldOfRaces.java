@@ -21,12 +21,17 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import com.example.worldofraces.entity.client.RaceEntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import com.example.worldofraces.entity.ModEntityTypes;
+import com.example.worldofraces.entity.RaceEntity;
+import com.example.worldofraces.client.menu.ModMenuTypes;
+import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/mods.toml file
@@ -67,6 +72,7 @@ public class WorldOfRaces
 
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::registerAttributes);
 
         // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
@@ -75,6 +81,7 @@ public class WorldOfRaces
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
         ModEntityTypes.register(modEventBus);
+        ModMenuTypes.register(modEventBus);
 
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
@@ -84,6 +91,11 @@ public class WorldOfRaces
 
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+    }
+
+    private void registerAttributes(final EntityAttributeCreationEvent event) {
+        event.put(ModEntityTypes.RACE_ENTITY.get(),
+                RaceEntity.createAttributes().build());
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
@@ -124,6 +136,16 @@ public class WorldOfRaces
             // Some client setup code
             LOGGER.info("HELLO FROM CLIENT SETUP");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+            event.enqueueWork(() -> {
+                net.minecraft.client.renderer.entity.EntityRenderers.register(
+                    com.example.worldofraces.entity.ModEntityTypes.RACE_ENTITY.get(),
+                    com.example.worldofraces.entity.client.RaceEntityRenderer::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.NPC_MENU.get(),
+                    com.example.worldofraces.client.gui.NpcScreen::new
+                );
+            });
         }
     }
 }
