@@ -1,0 +1,21 @@
+{
+  "dialogues": [
+    {
+      "id": "personal_intro",
+      "text": "Meu nome e {name}. Hoje estou {mood}. Ainda tenho muito a construir neste mundo.",
+      "responses": [
+        {"text": "E bom conhecer voce.", "nextDialogue": "greeting_day", "affinityChange": 2},
+        {"text": "Voce parece uma boa pessoa.", "nextDialogue": "greeting_day", "affinityChange": 2},
+        {"text": "Nao me interessa.", "nextDialogue": "greeting_day", "affinityChange": -3}
+      ]
+    },
+    {
+      "id": "help_intro",
+      "text": "Eu aceitaria ajuda de alguem em quem confio. Continue demonstrando suas intencoes.",
+      "responses": [
+        {"text": "Pode contar comigo.", "nextDialogue": "greeting_day", "requiresAffinity": 20, "affinityChange": 2},
+        {"text": "Talvez outra hora.", "nextDialogue": "greeting_day"}
+      ]
+    }
+  ]
+}

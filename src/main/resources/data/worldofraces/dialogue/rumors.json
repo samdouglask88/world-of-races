@@ -1,0 +1,20 @@
+{
+  "dialogues": [
+    {
+      "id": "rumors_intro",
+      "text": "Dizem que novas familias estao chegando a regiao. Ainda nao sei quais historias sao verdadeiras.",
+      "responses": [
+        {"text": "Continue atento.", "nextDialogue": "greeting_day", "affinityChange": 1},
+        {"text": "Rumores raramente ajudam.", "nextDialogue": "greeting_day"}
+      ]
+    },
+    {
+      "id": "region_intro",
+      "text": "Esta regiao ainda e selvagem. Uma vila segura precisara de comida, abrigo e pessoas dispostas a protege-la.",
+      "responses": [
+        {"text": "Eu posso ajudar a protege-la.", "nextDialogue": "greeting_day", "affinityChange": 2},
+        {"text": "Parece trabalho demais.", "nextDialogue": "greeting_day", "affinityChange": -1}
+      ]
+    }
+  ]
+}

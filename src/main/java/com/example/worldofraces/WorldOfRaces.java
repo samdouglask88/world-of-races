@@ -16,6 +16,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -77,6 +78,7 @@ public class WorldOfRaces
         // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so items get registered
+        com.example.worldofraces.profession.ModProfessionItems.bootstrap();
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
@@ -126,6 +128,11 @@ public class WorldOfRaces
         LOGGER.info("HELLO from server starting");
     }
 
+    @SubscribeEvent
+    public void onAddReloadListeners(AddReloadListenerEvent event) {
+        event.addListener(com.example.worldofraces.dialogue.DialogueRegistry.INSTANCE);
+    }
+
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ClientModEvents
@@ -144,6 +151,26 @@ public class WorldOfRaces
                 net.minecraft.client.gui.screens.MenuScreens.register(
                     com.example.worldofraces.client.menu.ModMenuTypes.NPC_MENU.get(),
                     com.example.worldofraces.client.gui.NpcScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.FAMILY_TREE_MENU.get(),
+                    com.example.worldofraces.client.gui.FamilyTreeScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.CONVERSATION_MENU.get(),
+                    com.example.worldofraces.client.gui.ConversationScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.PROFILE_MENU.get(),
+                    com.example.worldofraces.client.gui.ProfileScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.TRADE_MENU.get(),
+                    com.example.worldofraces.client.gui.TradeScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.example.worldofraces.client.menu.ModMenuTypes.PROFESSION_MENU.get(),
+                    com.example.worldofraces.client.gui.ProfessionScreen::new
                 );
             });
         }

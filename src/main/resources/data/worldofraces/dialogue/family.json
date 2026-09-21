@@ -1,0 +1,13 @@
+{
+  "dialogues": [
+    {
+      "id": "family_intro",
+      "text": "Minha linhagem pertence a {house}. Sobre meus pais: {father}; {mother}. Tenho {children} filhos.",
+      "responses": [
+        {"text": "Sua familia parece importante.", "nextDialogue": "greeting_day", "affinityChange": 2},
+        {"text": "Obrigado por confiar em mim.", "nextDialogue": "greeting_day", "affinityChange": 1},
+        {"text": "Prefiro falar de outra coisa.", "nextDialogue": "greeting_day"}
+      ]
+    }
+  ]
+}

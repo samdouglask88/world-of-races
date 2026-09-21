@@ -122,6 +122,22 @@ public final class FamilyManager {
         data.setDirty();
     }
 
+    public int changeAffinity(UUID personId, UUID playerId, int amount) {
+        int value = requirePerson(personId).changeAffinity(playerId, amount);
+        data.setDirty();
+        return value;
+    }
+
+    public void recordInteraction(UUID personId, long gameTime) {
+        requirePerson(personId).setLastInteractionTime(gameTime);
+        data.setDirty();
+    }
+
+    public void setInitialLocation(UUID personId, String origin, String residence) {
+        requirePerson(personId).setInitialLocation(origin, residence);
+        data.setDirty();
+    }
+
     private void validateParent(UUID childId, @Nullable UUID parentId) {
         if (parentId == null) return;
         requirePerson(parentId);

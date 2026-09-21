@@ -1,0 +1,33 @@
+{
+  "dialogues": [
+    {
+      "id": "greeting_morning",
+      "text": "Bom dia. Estou {mood}. O que deseja conversar?",
+      "responses": [
+        {"text": "Como voce esta?", "nextDialogue": "personal_intro", "affinityChange": 1},
+        {"text": "Conte-me sobre sua familia.", "nextDialogue": "family_intro", "requiresAffinity": 10, "affinityChange": 1},
+        {"text": "Ouviu algum rumor?", "nextDialogue": "rumors_intro"},
+        {"text": "Ate logo.", "endsConversation": true}
+      ]
+    },
+    {
+      "id": "greeting_day",
+      "text": "Saudacoes. Estou {mood}. Em que posso ajudar?",
+      "responses": [
+        {"text": "Quero conhecer voce melhor.", "nextDialogue": "personal_intro", "affinityChange": 1},
+        {"text": "Fale sobre sua familia.", "nextDialogue": "family_intro", "requiresAffinity": 10, "affinityChange": 1},
+        {"text": "Como estao as coisas por aqui?", "nextDialogue": "region_intro"},
+        {"text": "Ate logo.", "endsConversation": true}
+      ]
+    },
+    {
+      "id": "greeting_night",
+      "text": "Ja esta ficando tarde, mas ainda posso conversar um pouco.",
+      "responses": [
+        {"text": "Como foi seu dia?", "nextDialogue": "personal_intro", "affinityChange": 1},
+        {"text": "Alguma novidade?", "nextDialogue": "rumors_intro"},
+        {"text": "Nao vou tomar seu tempo.", "endsConversation": true}
+      ]
+    }
+  ]
+}
