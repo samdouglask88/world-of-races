@@ -1,0 +1,12 @@
+{
+  "dialogues": [
+    {
+      "id": "romance_intro",
+      "text": "Sinto que existe uma confianca especial entre nos, mas relacionamentos importantes exigem tempo.",
+      "responses": [
+        {"text": "Quero continuar ao seu lado.", "nextDialogue": "greeting_day", "requiresAffinity": 50, "affinityChange": 2},
+        {"text": "Nao quero apressar nada.", "nextDialogue": "greeting_day", "requiresAffinity": 50, "affinityChange": 1}
+      ]
+    }
+  ]
+}

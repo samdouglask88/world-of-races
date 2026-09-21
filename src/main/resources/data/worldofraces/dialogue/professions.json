@@ -1,0 +1,12 @@
+{
+  "dialogues": [
+    {
+      "id": "work_intro",
+      "text": "Ainda nao possuo uma profissao definida. Quando nosso povo estiver organizado, encontrarei um trabalho util.",
+      "responses": [
+        {"text": "Espero que encontre seu caminho.", "nextDialogue": "greeting_day", "affinityChange": 1},
+        {"text": "Todos devem contribuir.", "nextDialogue": "greeting_day"}
+      ]
+    }
+  ]
+}
