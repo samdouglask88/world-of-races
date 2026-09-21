@@ -42,7 +42,7 @@ public final class ConversationScreen extends AbstractContainerScreen<Conversati
         addNav(x, 100, "Conversar", Items.PAPER, -1, true);
         addNav(x, 129, "Familia", Items.PLAYER_HEAD, ConversationMenu.FAMILY, false);
         addNav(x, 158, "Casa", Items.OAK_DOOR, ConversationMenu.HOUSE, false);
-        addNav(x, 187, "Comercio", Items.EMERALD, ConversationMenu.TRADE, false);
+        addNav(x, 187, "Profissões", Items.IRON_PICKAXE, ConversationMenu.PROFESSION, false);
         addNav(x, 216, "Equipamento", Items.IRON_CHESTPLATE, ConversationMenu.EQUIPMENT, false);
         addNav(x, 267, "Seguir", Items.LEAD, ConversationMenu.FOLLOW, false);
         addNav(x, 296, "Ficar aqui", Items.COMPASS, ConversationMenu.STAY, false);
@@ -62,10 +62,9 @@ public final class ConversationScreen extends AbstractContainerScreen<Conversati
         addTopic("Familia", Items.PLAYER_HEAD, 1, 126);
         addTopic("Trabalho", Items.IRON_PICKAXE, 2, 152);
         addTopic("Rumores", Items.MAP, 4, 178);
-        addTopic("Vila ou regiao", Items.COMPASS, 3, 224);
-        addTopic("Pedir ajuda", Items.IRON_SWORD, 5, 250);
-        addTopic("Romance", Items.RED_DYE, 6, 276);
-        addWidget(466, 306, 98, 23, "Dar presente", Items.CHEST, ConversationMenu.GIFT, false);
+        addWidget(466, 224, 98, 23, "Elogiar", Items.RED_DYE, ConversationMenu.PRAISE, false);
+        addWidget(466, 250, 98, 23, "Dar presente", Items.CHEST, ConversationMenu.GIFT, false);
+        addWidget(466, 276, 98, 23, "Contar piada", Items.PAPER, ConversationMenu.JOKE, false);
         addRenderableWidget(new DialogueButton(leftPos + 545, topPos + 37, 26, 24,
                 Component.literal("X"), ItemStack.EMPTY, ignored -> onClose(), false));
     }
@@ -134,6 +133,7 @@ public final class ConversationScreen extends AbstractContainerScreen<Conversati
         graphics.drawCenteredString(font, "Escolha uma resposta", 320, 190, MUTED);
         graphics.drawCenteredString(font, "Assuntos", 515, 88, GOLD);
         graphics.drawCenteredString(font, "Interacao", 515, 208, GOLD);
+        graphics.drawCenteredString(font, "Disponível agora", 515, 306, 0xFF55DD55);
         graphics.drawCenteredString(font, "Escolha uma resposta para continuar a conversa", imageWidth / 2, 326, MUTED);
     }
 

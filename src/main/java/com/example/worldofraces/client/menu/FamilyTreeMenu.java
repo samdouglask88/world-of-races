@@ -26,6 +26,9 @@ public final class FamilyTreeMenu extends AbstractContainerMenu {
     public static final int HOUSE_ACTION = 202;
     public static final int TRADE_ACTION = 203;
     public static final int PROFILE_ACTION = 204;
+    public static final int PROFESSION_ACTION = 205;
+    public static final int FOLLOW_ACTION = 206;
+    public static final int STAY_ACTION = 207;
 
     private final RaceEntity npc;
     private final FamilyTreeSnapshot snapshot;
@@ -81,6 +84,25 @@ public final class FamilyTreeMenu extends AbstractContainerMenu {
         }
         if (buttonId == PROFILE_ACTION) {
             ProfileMenu.open(serverPlayer, npc, snapshot.focus().id());
+            return true;
+        }
+        if (buttonId == PROFESSION_ACTION) {
+            ProfessionMenu.open(serverPlayer, npc,
+                    npc.getProfessionData().profession() == com.example.worldofraces.profession.NpcProfession.NONE
+                            ? com.example.worldofraces.profession.NpcProfession.FARMER
+                            : npc.getProfessionData().profession());
+            return true;
+        }
+        if (buttonId == FOLLOW_ACTION) {
+            if (npc.getBehaviorMode() == com.example.worldofraces.entity.NpcBehaviorMode.FOLLOW) npc.wander();
+            else npc.follow(serverPlayer);
+            open(serverPlayer, npc, snapshot.focus().id(), snapshot.childPage());
+            return true;
+        }
+        if (buttonId == STAY_ACTION) {
+            if (npc.getBehaviorMode() == com.example.worldofraces.entity.NpcBehaviorMode.STAY) npc.wander();
+            else npc.stayHere();
+            open(serverPlayer, npc, snapshot.focus().id(), snapshot.childPage());
             return true;
         }
         FamilyTreeSnapshot.Node selected = snapshot.selectable(buttonId);

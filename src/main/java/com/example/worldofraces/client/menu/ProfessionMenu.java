@@ -1,5 +1,6 @@
 package com.example.worldofraces.client.menu;
 
+import com.example.worldofraces.entity.NpcBehaviorMode;
 import com.example.worldofraces.entity.RaceEntity;
 import com.example.worldofraces.profession.NpcProfession;
 import com.example.worldofraces.profession.ProfessionService;
@@ -14,17 +15,121 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkHooks;
 
 public final class ProfessionMenu extends AbstractContainerMenu {
-    public static final int ASSIGN=100,REMOVE=101,EQUIPMENT=102;
-    private final RaceEntity npc;private final Snapshot snapshot;
-    public ProfessionMenu(int id,Inventory inv,FriendlyByteBuf b){super(ModMenuTypes.PROFESSION_MENU.get(),id);if(!(inv.player.level().getEntity(b.readVarInt())instanceof RaceEntity race))throw new IllegalStateException("NPC nao encontrado");npc=race;snapshot=Snapshot.read(b);}
-    private ProfessionMenu(int id,Inventory inv,RaceEntity npc,Snapshot s){super(ModMenuTypes.PROFESSION_MENU.get(),id);this.npc=npc;snapshot=s;}
-    public Snapshot snapshot(){return snapshot;}public RaceEntity npc(){return npc;}
-    public static void open(ServerPlayer player,RaceEntity npc,NpcProfession selected){Snapshot s=Snapshot.create(npc,selected);NetworkHooks.openScreen(player,new SimpleMenuProvider((id,inv,x)->new ProfessionMenu(id,inv,npc,s),Component.literal("Profissoes")),b->{b.writeVarInt(npc.getId());s.write(b);});}
-    @Override public boolean clickMenuButton(Player p,int action){if(!(p instanceof ServerPlayer player)||!stillValid(p))return false;if(action>=0&&action<NpcProfession.values().length){open(player,npc,NpcProfession.values()[action]);return true;}if(action==ASSIGN){var result=ProfessionService.assign(player,npc,snapshot.selected);player.sendSystemMessage(Component.literal(result.message()));open(player,npc,snapshot.selected);return true;}if(action==REMOVE){ProfessionService.remove(player.serverLevel(),npc);open(player,npc,snapshot.selected);return true;}if(action==EQUIPMENT){NpcMenu.open(player,npc);return true;}return false;}
-    @Override public boolean stillValid(Player p){return npc.isAlive()&&npc.distanceToSqr(p)<=64;}@Override public ItemStack quickMoveStack(Player p,int i){return ItemStack.EMPTY;}
-    public record Snapshot(NpcProfession selected,NpcProfession current,int level,int experience,int needed,String aptitude,String station,boolean active,String blocked){
-        static Snapshot create(RaceEntity npc,NpcProfession selected){var d=npc.getProfessionData();String station=d.workstation()==null?"Nenhuma":d.workstation().getX()+", "+d.workstation().getY()+", "+d.workstation().getZ();String blocked;if(!selected.implemented)blocked="Em breve";else if(d.profession()!=selected)blocked="Pronto para atribuicao";else if(d.workstation()==null)blocked="Procurando bigorna...";else if(!ProfessionService.hasHammer(npc))blocked="Aguardando Martelo de ferreiro";else blocked=d.active()?"Trabalhando":"Aguardando horario ou materiais";return new Snapshot(selected,d.profession(),d.level(),d.experience(),d.experienceNeeded(),d.aptitude().name(),station,d.active(),blocked);}
-        void write(FriendlyByteBuf b){b.writeEnum(selected);b.writeEnum(current);b.writeVarInt(level);b.writeVarInt(experience);b.writeVarInt(needed);b.writeUtf(aptitude);b.writeUtf(station);b.writeBoolean(active);b.writeUtf(blocked);}
-        static Snapshot read(FriendlyByteBuf b){return new Snapshot(b.readEnum(NpcProfession.class),b.readEnum(NpcProfession.class),b.readVarInt(),b.readVarInt(),b.readVarInt(),b.readUtf(),b.readUtf(),b.readBoolean(),b.readUtf());}
+    public static final int ASSIGN = 100, REMOVE = 101, EQUIPMENT = 102,
+            TALK = 103, FAMILY = 104, HOUSE = 105, TRADE = 106, FOLLOW = 107, STAY = 108;
+
+    private final RaceEntity npc;
+    private final Snapshot snapshot;
+
+    public ProfessionMenu(int id, Inventory inventory, FriendlyByteBuf buffer) {
+        super(ModMenuTypes.PROFESSION_MENU.get(), id);
+        if (!(inventory.player.level().getEntity(buffer.readVarInt()) instanceof RaceEntity race)) {
+            throw new IllegalStateException("NPC não encontrado");
+        }
+        npc = race;
+        snapshot = Snapshot.read(buffer);
+    }
+
+    private ProfessionMenu(int id, Inventory inventory, RaceEntity npc, Snapshot snapshot) {
+        super(ModMenuTypes.PROFESSION_MENU.get(), id);
+        this.npc = npc;
+        this.snapshot = snapshot;
+    }
+
+    public Snapshot snapshot() { return snapshot; }
+    public RaceEntity npc() { return npc; }
+
+    public static void open(ServerPlayer player, RaceEntity npc, NpcProfession selected) {
+        Snapshot snapshot = Snapshot.create(npc, selected);
+        NetworkHooks.openScreen(player,
+                new SimpleMenuProvider((id, inventory, ignored) -> new ProfessionMenu(id, inventory, npc, snapshot),
+                        Component.literal("Profissões")),
+                buffer -> {
+                    buffer.writeVarInt(npc.getId());
+                    snapshot.write(buffer);
+                });
+    }
+
+    @Override
+    public boolean clickMenuButton(Player player, int action) {
+        if (!(player instanceof ServerPlayer server) || !stillValid(player)) return false;
+        if (action >= 0 && action < NpcProfession.values().length) {
+            open(server, npc, NpcProfession.values()[action]);
+            return true;
+        }
+        if (action == ASSIGN) {
+            ProfessionService.Result result = ProfessionService.assign(server, npc, snapshot.selected);
+            server.sendSystemMessage(Component.literal(result.message()));
+            open(server, npc, snapshot.selected);
+            return true;
+        }
+        if (action == REMOVE) {
+            ProfessionService.remove(server.serverLevel(), npc);
+            open(server, npc, snapshot.selected);
+            return true;
+        }
+        if (action == EQUIPMENT) { NpcMenu.open(server, npc); return true; }
+        if (action == TALK) { ConversationMenu.open(server, npc, "greeting"); return true; }
+        if (action == FAMILY && npc.getPersonId() != null) { FamilyTreeMenu.open(server, npc, npc.getPersonId(), 0); return true; }
+        if (action == HOUSE) {
+            var person = npc.getPerson(server.serverLevel()).orElse(null);
+            String house = person == null || person.getHouseId() == null ? "não pertence a uma Casa nobre"
+                    : com.example.worldofraces.society.HouseRegistry.get(person.getHouseId())
+                    .map(value -> "pertence à Casa " + value.surname()).orElse("pertence a uma Casa desconhecida");
+            server.sendSystemMessage(Component.literal(npc.getName().getString() + " " + house + "."));
+            return true;
+        }
+        if (action == TRADE) { TradeMenu.open(server, npc); return true; }
+        if (action == FOLLOW) {
+            if (npc.getBehaviorMode() == NpcBehaviorMode.FOLLOW) npc.wander();
+            else npc.follow(server);
+            open(server, npc, snapshot.selected);
+            return true;
+        }
+        if (action == STAY) {
+            if (npc.getBehaviorMode() == NpcBehaviorMode.STAY) npc.wander();
+            else npc.stayHere();
+            open(server, npc, snapshot.selected);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean stillValid(Player player) { return npc.isAlive() && npc.distanceToSqr(player) <= 64; }
+
+    @Override
+    public ItemStack quickMoveStack(Player player, int index) { return ItemStack.EMPTY; }
+
+    public record Snapshot(NpcProfession selected, NpcProfession current, int level, int experience,
+                           int needed, String aptitude, String station, boolean active,
+                           String status, NpcBehaviorMode behavior) {
+        static Snapshot create(RaceEntity npc, NpcProfession selected) {
+            var data = npc.getProfessionData();
+            String station = data.workstation() == null ? "Nenhuma"
+                    : data.workstation().getX() + ", " + data.workstation().getY() + ", " + data.workstation().getZ();
+            return new Snapshot(selected, data.profession(), data.level(), data.experience(),
+                    data.experienceNeeded(), data.aptitude().name(), station, data.active(),
+                    ProfessionService.status(npc, selected), npc.getBehaviorMode());
+        }
+
+        void write(FriendlyByteBuf buffer) {
+            buffer.writeEnum(selected);
+            buffer.writeEnum(current);
+            buffer.writeVarInt(level);
+            buffer.writeVarInt(experience);
+            buffer.writeVarInt(needed);
+            buffer.writeUtf(aptitude);
+            buffer.writeUtf(station);
+            buffer.writeBoolean(active);
+            buffer.writeUtf(status);
+            buffer.writeEnum(behavior);
+        }
+
+        static Snapshot read(FriendlyByteBuf buffer) {
+            return new Snapshot(buffer.readEnum(NpcProfession.class), buffer.readEnum(NpcProfession.class),
+                    buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(), buffer.readUtf(),
+                    buffer.readUtf(), buffer.readBoolean(), buffer.readUtf(), buffer.readEnum(NpcBehaviorMode.class));
+        }
     }
 }

@@ -37,8 +37,11 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -93,10 +96,26 @@ public class RaceEntity extends PathfinderMob implements MenuProvider, Merchant 
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new FollowAssignedPlayerGoal());
         this.goalSelector.addGoal(2, new ReturnToStayPositionGoal());
-        this.goalSelector.addGoal(3, new BlacksmithWorkGoal(this));
-        this.goalSelector.addGoal(4, new WanderWhenFreeGoal());
-        this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.15D, true));
+        this.goalSelector.addGoal(4, new BlacksmithWorkGoal(this));
+        this.goalSelector.addGoal(5, new WanderWhenFreeGoal());
+        this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Monster.class, true) {
+            @Override
+            public boolean canUse() {
+                return behaviorMode == NpcBehaviorMode.WANDER
+                        && professionData.profession() == com.example.worldofraces.profession.NpcProfession.GUARD
+                        && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return behaviorMode == NpcBehaviorMode.WANDER
+                        && professionData.profession() == com.example.worldofraces.profession.NpcProfession.GUARD
+                        && super.canContinueToUse();
+            }
+        });
     }
 
     @Override
@@ -128,19 +147,9 @@ public class RaceEntity extends PathfinderMob implements MenuProvider, Merchant 
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.level().isClientSide && this.level() instanceof ServerLevel serverLevel) {
             PersonData person = getPerson(serverLevel).orElse(null);
-            if (person == null) {
-                player.sendSystemMessage(Component.literal("[DEBUG] Pessoa ainda nao registrada"));
-            } else {
+            if (person != null) {
                 HumanSocietySavedData society = HumanSocietySavedData.get(serverLevel);
                 new FamilyManager(society).recordInteraction(person.getPersonId(), serverLevel.getGameTime());
-                player.sendSystemMessage(Component.literal(
-                        "[DEBUG] " + person.getDisplayName()
-                                + " | Casa: " + houseName(person)
-                                + " | Pai: " + personName(society, person.getFatherId(), "nenhum")
-                                + " | Mae: " + personName(society, person.getMotherId(), "nenhuma")
-                                + " | Conjuge: " + personName(society, person.getSpouseId(), "nenhum")
-                                + " | Ramo: " + householdName(society, person)
-                                + " | Filhos: " + person.getChildrenIds().size()));
             }
             if (player instanceof ServerPlayer serverPlayer) {
                 NetworkHooks.openScreen(serverPlayer, this, buffer -> buffer.writeVarInt(this.getId()));

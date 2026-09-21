@@ -29,6 +29,9 @@ public final class ConversationMenu extends AbstractContainerMenu {
     public static final int EQUIPMENT = 205;
     public static final int FOLLOW = 206;
     public static final int STAY = 207;
+    public static final int PROFESSION = 208;
+    public static final int PRAISE = 209;
+    public static final int JOKE = 210;
     public static final List<String> TOPICS = List.of(
             "personal_intro", "family_intro", "work_intro", "region_intro",
             "rumors_intro", "help_intro", "romance_intro");
@@ -131,6 +134,29 @@ public final class ConversationMenu extends AbstractContainerMenu {
         }
         if (buttonId == EQUIPMENT) {
             NpcMenu.open(serverPlayer, npc);
+            return true;
+        }
+        if (buttonId == PROFESSION) {
+            ProfessionMenu.open(serverPlayer, npc, npc.getProfessionData().profession() == com.example.worldofraces.profession.NpcProfession.NONE
+                    ? com.example.worldofraces.profession.NpcProfession.FARMER : npc.getProfessionData().profession());
+            return true;
+        }
+        if (buttonId == PRAISE) {
+            int affinity = npc.converse(serverPlayer);
+            serverPlayer.sendSystemMessage(Component.literal(npc.getName().getString()
+                    + " recebeu o elogio. Afinidade: " + affinity));
+            open(serverPlayer, npc, snapshot.nodeId());
+            return true;
+        }
+        if (buttonId == JOKE) {
+            HumanSocietySavedData society = HumanSocietySavedData.get(serverPlayer.serverLevel());
+            int change = npc.getRandom().nextInt(4) == 0 ? -1 : 2;
+            int affinity = new FamilyManager(society)
+                    .changeAffinity(npc.getPersonId(), serverPlayer.getUUID(), change);
+            serverPlayer.sendSystemMessage(Component.literal(change > 0
+                    ? npc.getName().getString() + " riu da piada. Afinidade: " + affinity
+                    : npc.getName().getString() + " não achou graça. Afinidade: " + affinity));
+            open(serverPlayer, npc, snapshot.nodeId());
             return true;
         }
         if (buttonId == FOLLOW) {

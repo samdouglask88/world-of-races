@@ -27,6 +27,8 @@ public final class TradeScreen extends AbstractContainerScreen<TradeMenu> {
         nav("Conversar",100,Items.PAPER,TradeMenu.TALK);nav("Familia",129,Items.PLAYER_HEAD,TradeMenu.FAMILY);nav("Casa",158,Items.OAK_DOOR,TradeMenu.HOUSE);
         nav("Profissoes",187,Items.IRON_PICKAXE,TradeMenu.PROFESSION);nav("Equipamento",216,Items.IRON_CHESTPLATE,TradeMenu.EQUIPMENT);
         add(leftPos+80,topPos+245,104,25,"Comercio",Items.EMERALD.getDefaultInstance(),()->{},true);
+        nav(menu.getNpc().getBehaviorMode()==com.example.worldofraces.entity.NpcBehaviorMode.FOLLOW?"Parar de seguir":"Seguir",279,Items.LEAD,TradeMenu.FOLLOW);
+        nav(menu.getNpc().getBehaviorMode()==com.example.worldofraces.entity.NpcBehaviorMode.STAY?"Pode andar":"Ficar aqui",308,Items.COMPASS,TradeMenu.STAY);
         filter("Todos",194,112,Filter.ALL);filter("Comida",234,112,Filter.FOOD);filter("Materiais",274,112,Filter.MATERIAL);filter("Equip.",326,112,Filter.EQUIPMENT);
         add(leftPos+356,topPos+113,43,22,"Comprar",ItemStack.EMPTY,()->send(TradeMenu.BUY),false);
         add(leftPos+402,topPos+113,43,22,"Vender",ItemStack.EMPTY,()->send(TradeMenu.SELL),false);
@@ -50,7 +52,8 @@ public final class TradeScreen extends AbstractContainerScreen<TradeMenu> {
         int bar=Math.round((menu.getAffinity()+100)/200F*124);g.fill(leftPos+421,topPos+72,leftPos+549,topPos+79,0xFF0D0F12);g.fill(leftPos+423,topPos+74,leftPos+423+bar,topPos+77,0xFFD5A83B);
     }
     @Override protected void renderLabels(GuiGraphics g,int mx,int my){String name=menu.getNpc().getName().getString();
-        g.drawString(font,name,190,41,GOLD,true);g.drawString(font,"Humano | Comerciante",190,59,TEXT,false);g.drawString(font,"Afinidade",421,57,GOLD,false);
+        String profession=menu.getNpc().getProfessionData().profession().name;
+        g.drawString(font,name,190,41,GOLD,true);g.drawString(font,"Humano | "+profession,190,59,TEXT,false);g.drawString(font,affinityLabel(menu.getAffinity()),421,57,GOLD,false);
         g.drawCenteredString(font,"Estoque de "+name,272,100,GOLD);g.drawCenteredString(font,"Operacao",401,100,GOLD);g.drawCenteredString(font,"Negociacao",515,100,GOLD);
         g.drawCenteredString(font,menu.getMode()==0?"Comprar":"Vender",401,141,menu.getMode()==0?0xFF55DD55:0xFFFFC44F);
         g.drawCenteredString(font,Integer.toString(menu.getAmount()),401,166,TEXT);
@@ -63,6 +66,7 @@ public final class TradeScreen extends AbstractContainerScreen<TradeMenu> {
         g.drawString(font,"Esmeraldas: "+menu.playerEmeralds(),198,296,GOLD,false);
         for(int i=0;i<18;i++){ItemStack stack=menu.getNpc().getTradeInventory().getItem(i);if(!visible(stack))g.fill(menu.slots.get(i).x-1,menu.slots.get(i).y-1,menu.slots.get(i).x+17,menu.slots.get(i).y+17,0xDD000000);}
     }
+    private static String affinityLabel(int value){if(value<=-60)return"Hostil";if(value<=-20)return"Desconfiado";if(value<20)return"Neutro";if(value<60)return"Amigavel";if(value<85)return"Proximo";return"Devoto";}
     private String warning(){if(menu.getResult()>0)return switch(menu.getResult()-1){case 2->"Estoque insuficiente";case 3->"Esmeraldas insuficientes";case 4->"Itens insuficientes";case 5->"NPC sem esmeraldas";case 6->"Sem espaco no inventario";default->"";};
         ItemStack s=menu.getSelectedStack();int total=menu.getUnitPrice()*menu.getAmount();if(!s.isEmpty()&&menu.getUnitPrice()>0){if(menu.getMode()==0&&menu.playerEmeralds()<total)return"Esmeraldas insuficientes";if(menu.getMode()==1&&menu.npcEmeralds()<total)return"NPC sem esmeraldas";}return"";}
     private boolean visible(ItemStack s){if(s.isEmpty()||s.is(Items.EMERALD))return false;return switch(filter){case ALL->true;case FOOD->s.isEdible();case EQUIPMENT->s.isDamageableItem();case MATERIAL->!s.isEdible()&&!s.isDamageableItem();};}

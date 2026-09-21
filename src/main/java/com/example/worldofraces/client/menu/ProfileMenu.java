@@ -35,6 +35,7 @@ public final class ProfileMenu extends AbstractContainerMenu {
         super(ModMenuTypes.PROFILE_MENU.get(), id); sourceNpc = npc; this.snapshot = snapshot;
     }
     public ProfileSnapshot getSnapshot() { return snapshot; }
+    public RaceEntity getSourceNpc() { return sourceNpc; }
 
     public static void open(ServerPlayer player, RaceEntity sourceNpc, UUID personId) {
         ServerLevel level = player.serverLevel();

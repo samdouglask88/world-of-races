@@ -3,6 +3,7 @@ package com.example.worldofraces.client.gui;
 import com.example.worldofraces.WorldOfRaces;
 import com.example.worldofraces.client.menu.FamilyTreeMenu;
 import com.example.worldofraces.client.menu.FamilyTreeSnapshot;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
@@ -45,15 +46,16 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
                 (this.width - SCREEN_MARGIN * 2.0F) / this.imageWidth,
                 (this.height - SCREEN_MARGIN * 2.0F) / this.imageHeight));
 
-        int x = leftPos + 80;
-        int y = topPos + 100;
-        addSideButton("Conversar", x, y, false, FamilyTreeMenu.TALK_ACTION);
-        addSideButton("Familia", x, y + 29, true, -1);
-        addSideButton("Casa", x, y + 58, false, FamilyTreeMenu.HOUSE_ACTION);
-        addSideButton("Comercio", x, y + 87, false, FamilyTreeMenu.TRADE_ACTION);
-        addSideButton("Equipamento", x, y + 116, false, FamilyTreeMenu.EQUIPMENT_TAB);
-        addSideButton("Seguir", x, y + 167, false, -1);
-        addSideButton("Ficar aqui", x, y + 196, false, -1);
+        // family_tree_frame has a narrower sidebar than npc_menu_frame.
+        int x = leftPos + 76;
+        int y = topPos + 92;
+        addSideButton("Conversar", x, y, false, FamilyTreeMenu.TALK_ACTION, 27);
+        addSideButton("Família", x, y + 32, true, -1, 27);
+        addSideButton("Casa", x, y + 64, false, FamilyTreeMenu.HOUSE_ACTION, 27);
+        addSideButton("Profissões", x, y + 96, false, FamilyTreeMenu.PROFESSION_ACTION, 27);
+        addSideButton("Equipamento", x, y + 128, false, FamilyTreeMenu.EQUIPMENT_TAB, 27);
+        addSideButton("Seguir", x, topPos + 266, false, FamilyTreeMenu.FOLLOW_ACTION, 22);
+        addSideButton("Ficar aqui", x, topPos + 290, false, FamilyTreeMenu.STAY_ACTION, 22);
 
         FamilyTreeSnapshot tree = menu.getSnapshot();
         addPerson(tree.father(), "Pai", 0, 194, 87, 116, 54, false);
@@ -66,9 +68,9 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
             addPerson(children.get(i), relation, 3 + i, 194 + i * 63, 246, 58, 54, false);
         }
 
-        if (tree.childPage() > 0) addSmallButton("<", 388, 287, FamilyTreeMenu.PREVIOUS_PAGE);
+        if (tree.childPage() > 0) addSmallButton("<", 270, 301, FamilyTreeMenu.PREVIOUS_PAGE);
         if (tree.childPage() + 1 < tree.childPageCount()) {
-            addSmallButton(">", 416, 287, FamilyTreeMenu.NEXT_PAGE);
+            addSmallButton(">", 352, 301, FamilyTreeMenu.NEXT_PAGE);
         }
         addRenderableWidget(new TreeButton(leftPos + 466, topPos + 281, 98, 28,
                 Component.literal("Ver perfil"), Items.PLAYER_HEAD.getDefaultInstance(), button -> {
@@ -78,17 +80,17 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
                 Component.literal("X"), button -> onClose(), false));
     }
 
-    private void addSideButton(String label, int x, int y, boolean selected, int action) {
+    private void addSideButton(String label, int x, int y, boolean selected, int action, int height) {
         ItemStack icon = switch (label) {
             case "Conversar" -> Items.PAPER.getDefaultInstance();
-            case "Familia" -> Items.PLAYER_HEAD.getDefaultInstance();
+            case "Família" -> Items.PLAYER_HEAD.getDefaultInstance();
             case "Casa" -> Items.OAK_DOOR.getDefaultInstance();
-            case "Comercio" -> Items.EMERALD.getDefaultInstance();
+            case "Profissões" -> Items.IRON_PICKAXE.getDefaultInstance();
             case "Equipamento" -> Items.IRON_CHESTPLATE.getDefaultInstance();
             case "Seguir" -> Items.LEAD.getDefaultInstance();
             default -> Items.COMPASS.getDefaultInstance();
         };
-        addRenderableWidget(new TreeButton(x, y, 104, 25, Component.literal(label), icon, button -> {
+        addRenderableWidget(new TreeButton(x, y, 78, height, Component.literal(label), icon, button -> {
             if (action >= 0) sendButton(action);
             else if (!selected && minecraft != null && minecraft.player != null) {
                 minecraft.player.displayClientMessage(Component.literal(label + ": recurso em desenvolvimento"), true);
@@ -104,7 +106,7 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
     }
 
     private void addSmallButton(String text, int x, int y, int action) {
-        addRenderableWidget(new TreeButton(leftPos + x, topPos + y, 22, 18,
+        addRenderableWidget(new TreeButton(leftPos + x, topPos + y, 18, 13,
                 Component.literal(text), button -> sendButton(action), false));
     }
 
@@ -116,8 +118,14 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         graphics.blit(FRAME, leftPos, topPos, imageWidth, imageHeight,
                 0.0F, 0.0F, TEXTURE_WIDTH, TEXTURE_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        // Keep each content area opaque and clipped to its own frame while the menu refreshes.
+        graphics.fill(leftPos + 166, topPos + 89, leftPos + 459, topPos + 313, 0xE8181A1D);
+        graphics.fill(leftPos + 464, topPos + 89, leftPos + 566, topPos + 313, 0xE8181A1D);
+        outline(graphics, leftPos + 165, topPos + 88, 295, 226, 0xFF8A6B32);
+        outline(graphics, leftPos + 463, topPos + 88, 104, 226, 0xFF8A6B32);
         FamilyTreeSnapshot tree = menu.getSnapshot();
         int gold = 0xFFD0A347;
 
@@ -184,8 +192,9 @@ public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMe
             graphics.drawCenteredString(font, "Nenhum parente conhecido", 302, 235, 0xFFAAA79F);
         }
 
-        String page = "Filhos: " + (tree.childPage() + 1) + "/" + tree.childPageCount();
-        graphics.drawCenteredString(font, page, 302, 296, 0xFFB7B1A7);
+        String page = tree.totalChildren() == 0 ? "Filhos: 0"
+                : "Filhos: " + (tree.childPage() + 1) + "/" + tree.childPageCount();
+        graphics.drawCenteredString(font, page, 320, 303, 0xFFB7B1A7);
         graphics.drawCenteredString(font, "Clique em um parente para navegar", imageWidth / 2, 329, 0xFFAAA79F);
     }
 

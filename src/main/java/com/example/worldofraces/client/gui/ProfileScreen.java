@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -46,8 +47,20 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
         g.blit(FRAME, leftPos, topPos, W, H, 0, 0, TW, TH, TW, TH);
         panel(g, 78, 86, 112, 236); panel(g, 198, 86, 172, 126); panel(g, 198, 218, 172, 64);
         panel(g, 378, 86, 184, 126); panel(g, 378, 218, 184, 64);
-        g.pose().pushPose(); g.pose().translate(leftPos + 108, topPos + 99, 0); g.pose().scale(3.25F, 3.25F, 1);
-        g.renderItem(Items.PLAYER_HEAD.getDefaultInstance(), 0, 0); g.pose().popPose();
+        if (menu.getSourceNpc().getPersonId() != null
+                && menu.getSourceNpc().getPersonId().equals(menu.getSnapshot().personId())) {
+            Component savedName = menu.getSourceNpc().getCustomName();
+            boolean nameVisible = menu.getSourceNpc().isCustomNameVisible();
+            menu.getSourceNpc().setCustomNameVisible(false);
+            menu.getSourceNpc().setCustomName(null);
+            InventoryScreen.renderEntityInInventoryFollowsMouse(g, leftPos + 134, topPos + 155, 42,
+                    leftPos + 134 - mouseX, topPos + 112 - mouseY, menu.getSourceNpc());
+            menu.getSourceNpc().setCustomName(savedName);
+            menu.getSourceNpc().setCustomNameVisible(nameVisible);
+        } else {
+            g.pose().pushPose(); g.pose().translate(leftPos + 108, topPos + 99, 0); g.pose().scale(3.25F, 3.25F, 1);
+            g.renderItem(Items.PLAYER_HEAD.getDefaultInstance(), 0, 0); g.pose().popPose();
+        }
         int affinity = menu.getSnapshot().affinity();
         g.fill(leftPos + 88, topPos + 286, leftPos + 180, topPos + 294, 0xFF0B0D10);
         g.fill(leftPos + 90, topPos + 288, leftPos + 90 + Math.round((affinity + 100) / 200F * 88), topPos + 292,
@@ -57,7 +70,7 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
     @Override protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
         ProfileSnapshot p = menu.getSnapshot();
         g.drawCenteredString(font, "Perfil do habitante", W / 2, 39, GOLD);
-        g.drawCenteredString(font, "Informacoes pessoais e familiares", W / 2, 53, MUTED);
+        g.drawCenteredString(font, "Informações pessoais e familiares", W / 2, 53, MUTED);
         drawFitted(g, p.name(), 88, 158, 92, GOLD);
         drawFitted(g, "Humano | " + (p.house().equals("Sem Casa") ? "Plebeu" : "Nobre"), 88, 174, 92, TEXT);
         g.drawString(font, p.alive() ? "Vivo" : "Falecido", 88, 192, p.alive() ? 0xFF55DD55 : 0xFFE05B5B, false);
@@ -66,26 +79,26 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
         g.drawString(font, affinity(p.affinity()), 88, 267, GOLD, false);
         g.drawCenteredString(font, p.affinity() + " / 100", 134, 299, MUTED);
 
-        title(g, "Informacoes", 204, 94);
+        title(g, "Informações", 204, 94);
         line(g, "Idade", reveal(p, 2, p.age() + " anos"), 204, 116);
-        line(g, "Profissao", reveal(p, 2, p.profession()), 204, 132);
+        line(g, "Profissão", reveal(p, 2, p.profession()), 204, 132);
         line(g, "Moradia", reveal(p, 2, p.residence()), 204, 148);
         line(g, "Personalidade", reveal(p, 2, p.personality()), 204, 164);
         line(g, "Moral", reveal(p, 3, p.morality()), 204, 180);
 
         title(g, "Familia", 204, 226);
         line(g, "Pai", reveal(p, 2, p.father()), 204, 242);
-        line(g, "Mae", reveal(p, 2, p.mother()), 204, 253);
-        line(g, "Conjuge", reveal(p, 2, p.spouse()), 204, 264);
+        line(g, "Mãe", reveal(p, 2, p.mother()), 204, 253);
+        line(g, "Cônjuge", reveal(p, 2, p.spouse()), 204, 264);
         line(g, "Filhos", reveal(p, 2, Integer.toString(p.children())), 204, 275);
 
-        title(g, "Historico", 384, 94);
+        title(g, "Histórico", 384, 94);
         line(g, "Casa", reveal(p, 2, p.house()), 384, 116);
         line(g, "Origem", reveal(p, 3, p.origin()), 384, 136);
-        line(g, "Reputacao", reveal(p, 2, affinity(p.affinity())), 384, 156);
-        line(g, "Ultima interacao", reveal(p, 3, p.lastInteraction()), 384, 176);
+        line(g, "Reputação", reveal(p, 2, affinity(p.affinity())), 384, 156);
+        line(g, "Última interação", reveal(p, 3, p.lastInteraction()), 384, 176);
 
-        title(g, "Caracteristicas", 384, 226);
+        title(g, "Características", 384, 226);
         if (p.knowledge() >= 3) {
             stat(g, "Forca", p.strength(), 384, 242); stat(g, "Inteligencia", p.intelligence(), 384, 252);
             stat(g, "Carisma", p.charisma(), 384, 262); stat(g, "Coragem", p.courage(), 384, 272);

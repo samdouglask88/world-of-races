@@ -19,7 +19,8 @@ import net.minecraftforge.network.NetworkHooks;
 public final class TradeMenu extends AbstractContainerMenu {
     public static final int SELECT_STOCK = 0, SELECT_PLAYER = 100, BUY = 200, SELL = 201,
             MINUS = 202, PLUS = 203, CONFIRM = 204;
-    public static final int TALK=300,FAMILY=301,HOUSE=302,PROFESSION=303,EQUIPMENT=304;
+    public static final int TALK=300,FAMILY=301,HOUSE=302,PROFESSION=303,EQUIPMENT=304,
+            FOLLOW=305,STAY=306;
     private final RaceEntity npc;
     private final Inventory playerInventory;
     private int selectedSlot = -1, mode, amount = 1, result, affinity;
@@ -48,6 +49,11 @@ public final class TradeMenu extends AbstractContainerMenu {
         return new DataSlot(){public int get(){return get.getAsInt();}public void set(int value){set.accept(value);}};
     }
     public static void open(ServerPlayer player, RaceEntity npc) {
+        if (npc.getProfessionData().profession() != com.example.worldofraces.profession.NpcProfession.MERCHANT) {
+            player.sendSystemMessage(Component.literal(npc.getName().getString()
+                    + " precisa trabalhar como comerciante para negociar."));
+            return;
+        }
         NetworkHooks.openScreen(player,new SimpleMenuProvider((id,inv,ignored)->new TradeMenu(id,inv,npc),
                 Component.literal("Comercio - "+npc.getName().getString())),b->b.writeVarInt(npc.getId()));
     }
@@ -69,11 +75,17 @@ public final class TradeMenu extends AbstractContainerMenu {
         if(action==TALK){ConversationMenu.open(server,npc,"greeting");return true;}
         if(action==FAMILY&&npc.getPersonId()!=null){FamilyTreeMenu.open(server,npc,npc.getPersonId(),0);return true;}
         if(action==EQUIPMENT){NpcMenu.open(server,npc);return true;}
-        if(action==HOUSE||action==PROFESSION){
+        if(action==PROFESSION){
+            ProfessionMenu.open(server,npc,npc.getProfessionData().profession()==com.example.worldofraces.profession.NpcProfession.NONE
+                    ?com.example.worldofraces.profession.NpcProfession.FARMER:npc.getProfessionData().profession());
+            return true;
+        }
+        if(action==FOLLOW){if(npc.getBehaviorMode()==com.example.worldofraces.entity.NpcBehaviorMode.FOLLOW)npc.wander();else npc.follow(server);TradeMenu.open(server,npc);return true;}
+        if(action==STAY){if(npc.getBehaviorMode()==com.example.worldofraces.entity.NpcBehaviorMode.STAY)npc.wander();else npc.stayHere();TradeMenu.open(server,npc);return true;}
+        if(action==HOUSE){
             var person=npc.getPerson(server.serverLevel()).orElse(null);
             if(person==null)return true;
-            if(action==PROFESSION)server.sendSystemMessage(Component.literal(person.getDisplayName()+" trabalha como "+person.getProfession()+"."));
-            else {String house=person.getHouseId()==null?"nao pertence a uma Casa nobre":com.example.worldofraces.society.HouseRegistry.get(person.getHouseId()).map(h->"pertence a Casa "+h.surname()).orElse("pertence a uma Casa desconhecida");server.sendSystemMessage(Component.literal(person.getDisplayName()+" "+house+"."));}
+            String house=person.getHouseId()==null?"nao pertence a uma Casa nobre":com.example.worldofraces.society.HouseRegistry.get(person.getHouseId()).map(h->"pertence a Casa "+h.surname()).orElse("pertence a uma Casa desconhecida");server.sendSystemMessage(Component.literal(person.getDisplayName()+" "+house+"."));
             return true;
         }
         return false;
