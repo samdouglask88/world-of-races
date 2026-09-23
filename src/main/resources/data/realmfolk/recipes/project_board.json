@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:oak_planks" },
+    { "item": "minecraft:paper" }
+  ],
+  "result": { "item": "realmfolk:project_board", "count": 1 }
+}

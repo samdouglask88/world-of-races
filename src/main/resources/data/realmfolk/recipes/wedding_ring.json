@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:gold_ingot" }
+  ],
+  "result": { "item": "realmfolk:wedding_ring", "count": 2 }
+}

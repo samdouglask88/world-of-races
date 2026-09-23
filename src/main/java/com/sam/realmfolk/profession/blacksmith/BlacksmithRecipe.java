@@ -3,6 +3,7 @@ package com.sam.realmfolk.profession.blacksmith;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import java.util.List;
+import java.util.Optional;
 
 public enum BlacksmithRecipe {
     IRON_SHOVEL(1,Items.IRON_SHOVEL,10,List.of(new Ingredient(Items.IRON_INGOT,1),new Ingredient(Items.STICK,2))),
@@ -13,5 +14,9 @@ public enum BlacksmithRecipe {
     IRON_CHESTPLATE(3,Items.IRON_CHESTPLATE,50,List.of(new Ingredient(Items.IRON_INGOT,8)));
     public final int level,xp;public final Item result;public final List<Ingredient> ingredients;
     BlacksmithRecipe(int level,Item result,int xp,List<Ingredient> ingredients){this.level=level;this.result=result;this.xp=xp;this.ingredients=ingredients;}
+    public static Optional<BlacksmithRecipe> forResult(Item item) {
+        for (BlacksmithRecipe recipe : values()) if (recipe.result == item) return Optional.of(recipe);
+        return Optional.empty();
+    }
     public record Ingredient(Item item,int count){}
 }

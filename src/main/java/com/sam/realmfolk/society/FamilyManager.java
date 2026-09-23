@@ -89,6 +89,10 @@ public final class FamilyManager {
     }
 
     public PersonData createChild(UUID householdId, String firstName, Gender gender) {
+        return createChild(householdId, firstName, gender, -1L);
+    }
+
+    public PersonData createChild(UUID householdId, String firstName, Gender gender, long birthGameTime) {
         HouseholdData household = requireHousehold(householdId);
         UUID spouseAId = household.getSpouseAId();
         UUID spouseBId = household.getSpouseBId();
@@ -105,11 +109,49 @@ public final class FamilyManager {
         }
 
         PersonData child = createPerson(firstName, household.getPrimaryHouseId(), gender, LifeStage.BABY);
+        child.setAge(0);
+        child.setBirthGameTime(birthGameTime);
         setParents(child.getPersonId(), fatherId, motherId);
         child.setHouseholdId(householdId);
         household.addChild(child.getPersonId());
         data.setDirty();
         return child;
+    }
+
+    public void startPregnancy(UUID motherId, UUID fatherId, long startedAt, long dueAt) {
+        PersonData mother = requirePerson(motherId);
+        PersonData father = requirePerson(fatherId);
+        if (mother.getGender() != Gender.FEMALE || father.getGender() != Gender.MALE) {
+            throw new IllegalArgumentException("A gravidez exige mae e pai registrados");
+        }
+        if (!Objects.equals(mother.getSpouseId(), fatherId) || !Objects.equals(father.getSpouseId(), motherId)) {
+            throw new IllegalArgumentException("Os pais precisam pertencer ao mesmo casamento");
+        }
+        if (mother.isPregnant()) throw new IllegalArgumentException("A mae ja possui uma gravidez ativa");
+        mother.startPregnancy(fatherId, startedAt, dueAt);
+        data.setDirty();
+    }
+
+    public void finishPregnancy(UUID motherId, long nextAllowedAt) {
+        requirePerson(motherId).finishPregnancy(nextAllowedAt);
+        data.setDirty();
+    }
+
+    public void rollbackCreatedChild(UUID childId) {
+        PersonData child = requirePerson(childId);
+        removeFromOldParent(child.getFatherId(), childId);
+        removeFromOldParent(child.getMotherId(), childId);
+        if (child.getHouseholdId() != null) {
+            data.getHousehold(child.getHouseholdId()).ifPresent(household -> household.removeChild(childId));
+        }
+        data.removePerson(childId);
+    }
+
+    public void updateLifeStage(UUID personId, LifeStage stage, int age) {
+        PersonData person = requirePerson(personId);
+        person.setLifeStage(stage);
+        person.setAge(age);
+        data.setDirty();
     }
 
     public void markDeceased(UUID personId) {
@@ -136,6 +178,12 @@ public final class FamilyManager {
     public void setInitialLocation(UUID personId, String origin, String residence) {
         requirePerson(personId).setInitialLocation(origin, residence);
         data.setDirty();
+    }
+
+    public boolean updateResidence(UUID personId, String residence) {
+        boolean changed = requirePerson(personId).setResidence(residence);
+        if (changed) data.setDirty();
+        return changed;
     }
 
     private void validateParent(UUID childId, @Nullable UUID parentId) {

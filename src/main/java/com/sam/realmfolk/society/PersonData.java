@@ -38,6 +38,11 @@ public final class PersonData {
     private int intelligence;
     private int charisma;
     private int courage;
+    private long birthGameTime = -1L;
+    @Nullable private UUID pregnancyPartnerId;
+    private long pregnancyStartedGameTime = -1L;
+    private long pregnancyDueGameTime = -1L;
+    private long nextPregnancyAllowedGameTime;
 
     public PersonData(UUID personId, String firstName, @Nullable ResourceLocation houseId,
                       Gender gender, LifeStage lifeStage) {
@@ -74,6 +79,12 @@ public final class PersonData {
     public int getIntelligence() { return intelligence; }
     public int getCharisma() { return charisma; }
     public int getCourage() { return courage; }
+    public long getBirthGameTime() { return birthGameTime; }
+    @Nullable public UUID getPregnancyPartnerId() { return pregnancyPartnerId; }
+    public long getPregnancyStartedGameTime() { return pregnancyStartedGameTime; }
+    public long getPregnancyDueGameTime() { return pregnancyDueGameTime; }
+    public long getNextPregnancyAllowedGameTime() { return nextPregnancyAllowedGameTime; }
+    public boolean isPregnant() { return pregnancyPartnerId != null && pregnancyDueGameTime >= 0L; }
 
     public String getDisplayName() {
         if (houseId == null) return firstName;
@@ -89,10 +100,28 @@ public final class PersonData {
     void setHouseholdId(@Nullable UUID householdId) { this.householdId = householdId; }
     void setStatus(PersonStatus status) { this.status = status; }
     void setLifeStage(LifeStage lifeStage) { this.lifeStage = lifeStage; }
+    void setAge(int age) { this.age = Math.max(0, age); }
+    void setBirthGameTime(long gameTime) { this.birthGameTime = gameTime; }
+    void startPregnancy(UUID partnerId, long startedAt, long dueAt) {
+        this.pregnancyPartnerId = partnerId;
+        this.pregnancyStartedGameTime = startedAt;
+        this.pregnancyDueGameTime = dueAt;
+    }
+    void finishPregnancy(long nextAllowedAt) {
+        this.pregnancyPartnerId = null;
+        this.pregnancyStartedGameTime = -1L;
+        this.pregnancyDueGameTime = -1L;
+        this.nextPregnancyAllowedGameTime = Math.max(this.nextPregnancyAllowedGameTime, nextAllowedAt);
+    }
     void setLastInteractionTime(long time) { this.lastInteractionTime = time; }
     void setInitialLocation(String origin, String residence) {
         if (this.origin.equals("Desconhecida")) this.origin = origin;
         if (this.residence.equals("Nao definida")) this.residence = residence;
+    }
+    boolean setResidence(String value) {
+        if (value == null || value.isBlank() || value.equals(this.residence)) return false;
+        this.residence = value;
+        return true;
     }
 
     int changeAffinity(UUID playerId, int amount) {
@@ -150,6 +179,11 @@ public final class PersonData {
         tag.putInt("Intelligence", intelligence);
         tag.putInt("Charisma", charisma);
         tag.putInt("Courage", courage);
+        tag.putLong("BirthGameTime", birthGameTime);
+        if (pregnancyPartnerId != null) tag.putUUID("PregnancyPartnerId", pregnancyPartnerId);
+        tag.putLong("PregnancyStartedGameTime", pregnancyStartedGameTime);
+        tag.putLong("PregnancyDueGameTime", pregnancyDueGameTime);
+        tag.putLong("NextPregnancyAllowedGameTime", nextPregnancyAllowedGameTime);
         return tag;
     }
 
@@ -192,6 +226,11 @@ public final class PersonData {
         if (tag.contains("Intelligence")) person.intelligence = tag.getInt("Intelligence");
         if (tag.contains("Charisma")) person.charisma = tag.getInt("Charisma");
         if (tag.contains("Courage")) person.courage = tag.getInt("Courage");
+        if (tag.contains("BirthGameTime")) person.birthGameTime = tag.getLong("BirthGameTime");
+        if (tag.hasUUID("PregnancyPartnerId")) person.pregnancyPartnerId = tag.getUUID("PregnancyPartnerId");
+        if (tag.contains("PregnancyStartedGameTime")) person.pregnancyStartedGameTime = tag.getLong("PregnancyStartedGameTime");
+        if (tag.contains("PregnancyDueGameTime")) person.pregnancyDueGameTime = tag.getLong("PregnancyDueGameTime");
+        if (tag.contains("NextPregnancyAllowedGameTime")) person.nextPregnancyAllowedGameTime = tag.getLong("NextPregnancyAllowedGameTime");
         return person;
     }
 

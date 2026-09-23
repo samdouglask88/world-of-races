@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:oak_planks" },
+    { "item": "minecraft:emerald" }
+  ],
+  "result": { "item": "realmfolk:treasury_marker", "count": 1 }
+}

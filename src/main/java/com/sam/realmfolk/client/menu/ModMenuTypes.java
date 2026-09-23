@@ -24,6 +24,8 @@ public final class ModMenuTypes {
             MENUS.register("trade_menu", () -> IForgeMenuType.create(TradeMenu::new));
     public static final RegistryObject<MenuType<ProfessionMenu>> PROFESSION_MENU =
             MENUS.register("profession_menu", () -> IForgeMenuType.create(ProfessionMenu::new));
+    public static final RegistryObject<MenuType<DocumentMenu>> DOCUMENT_MENU =
+            MENUS.register("document_menu", () -> IForgeMenuType.create(DocumentMenu::new));
 
     private ModMenuTypes() {
     }

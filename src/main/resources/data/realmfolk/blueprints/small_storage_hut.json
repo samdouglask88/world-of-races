@@ -1,0 +1,47 @@
+{
+  "id": "realmfolk:small_storage_hut",
+  "name": "Pequeno depósito",
+  "size": [3, 4, 3],
+  "entrance": [1, 1, 0],
+  "minimum_level": "CAMP",
+  "tags": ["storage", "starter"],
+  "blocks": [
+    { "pos": [0, 0, 0], "block": "minecraft:cobblestone" },
+    { "pos": [1, 0, 0], "block": "minecraft:cobblestone" },
+    { "pos": [2, 0, 0], "block": "minecraft:cobblestone" },
+    { "pos": [0, 0, 1], "block": "minecraft:cobblestone" },
+    { "pos": [1, 0, 1], "block": "minecraft:cobblestone" },
+    { "pos": [2, 0, 1], "block": "minecraft:cobblestone" },
+    { "pos": [0, 0, 2], "block": "minecraft:cobblestone" },
+    { "pos": [1, 0, 2], "block": "minecraft:cobblestone" },
+    { "pos": [2, 0, 2], "block": "minecraft:cobblestone" },
+
+    { "pos": [0, 1, 0], "block": "minecraft:oak_planks" },
+    { "pos": [2, 1, 0], "block": "minecraft:oak_planks" },
+    { "pos": [0, 1, 1], "block": "minecraft:oak_planks" },
+    { "pos": [2, 1, 1], "block": "minecraft:oak_planks" },
+    { "pos": [0, 1, 2], "block": "minecraft:oak_planks" },
+    { "pos": [1, 1, 2], "block": "minecraft:oak_planks" },
+    { "pos": [2, 1, 2], "block": "minecraft:oak_planks" },
+
+    { "pos": [0, 2, 0], "block": "minecraft:oak_planks" },
+    { "pos": [2, 2, 0], "block": "minecraft:oak_planks" },
+    { "pos": [0, 2, 1], "block": "minecraft:oak_planks" },
+    { "pos": [2, 2, 1], "block": "minecraft:oak_planks" },
+    { "pos": [0, 2, 2], "block": "minecraft:oak_planks" },
+    { "pos": [1, 2, 2], "block": "minecraft:oak_planks" },
+    { "pos": [2, 2, 2], "block": "minecraft:oak_planks" },
+
+    { "pos": [0, 3, 0], "block": "minecraft:oak_slab" },
+    { "pos": [1, 3, 0], "block": "minecraft:oak_slab" },
+    { "pos": [2, 3, 0], "block": "minecraft:oak_slab" },
+    { "pos": [0, 3, 1], "block": "minecraft:oak_slab" },
+    { "pos": [1, 3, 1], "block": "minecraft:oak_slab" },
+    { "pos": [2, 3, 1], "block": "minecraft:oak_slab" },
+    { "pos": [0, 3, 2], "block": "minecraft:oak_slab" },
+    { "pos": [1, 3, 2], "block": "minecraft:oak_slab" },
+    { "pos": [2, 3, 2], "block": "minecraft:oak_slab" },
+
+    { "pos": [1, 1, 1], "block": "minecraft:barrel" }
+  ]
+}

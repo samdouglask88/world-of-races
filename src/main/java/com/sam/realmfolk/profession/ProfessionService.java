@@ -21,6 +21,7 @@ public final class ProfessionService {
     private ProfessionService() {}
 
     public static Result assign(ServerPlayer player, ResidentEntity npc, NpcProfession profession) {
+        if (!npc.isWorkingAge()) return new Result(false, "Somente habitantes adultos podem exercer profissao");
         if (!npc.isAlive() || npc.distanceToSqr(player) > 64) return new Result(false, "Habitante distante ou inválido");
         if (!profession.implemented || profession == NpcProfession.NONE) return new Result(false, "Profissão indisponível");
         ServerLevel level = player.serverLevel();
@@ -89,6 +90,10 @@ public final class ProfessionService {
 
     public static boolean hasRequiredTool(ResidentEntity npc) {
         NpcProfession profession = npc.getProfessionData().profession();
+        if (profession == NpcProfession.COOK) {
+            return findTool(npc, com.sam.realmfolk.content.ModItems.COOK_LADLE.get()) != -1
+                    || findTool(npc, com.sam.realmfolk.content.ModItems.KITCHEN_KNIFE.get()) != -1;
+        }
         return !profession.requiresTool() || findTool(npc, profession.requiredTool()) != -1;
     }
 
@@ -111,6 +116,10 @@ public final class ProfessionService {
     }
 
     public static ProductionResult produce(ResidentEntity npc) {
+        return produce(npc, Items.AIR);
+    }
+
+    public static ProductionResult produce(ResidentEntity npc, Item desiredResult) {
         NpcProfession profession = npc.getProfessionData().profession();
         if (!hasRequiredTool(npc)) return ProductionResult.NO_TOOL;
         return switch (profession) {
@@ -120,7 +129,7 @@ public final class ProfessionService {
             case FISHERMAN -> gather(npc, npc.getRandom().nextInt(4) == 0 ? Items.SALMON : Items.COD, 1, 12);
             case HUNTER -> craft(npc, Items.ARROW, 1,
                     npc.getRandom().nextBoolean() ? Items.BEEF : Items.LEATHER, 1, 14);
-            case BLACKSMITH -> forge(npc);
+            case BLACKSMITH -> forge(npc, desiredResult);
             case COOK -> cook(npc);
             case MERCHANT -> stockStore(npc);
             case BUILDER -> craft(npc, Items.COBBLESTONE, 4, Items.STONE_BRICKS, 4, 16);
@@ -163,10 +172,11 @@ public final class ProfessionService {
         return ProductionResult.NO_RECIPE;
     }
 
-    private static ProductionResult forge(ResidentEntity npc) {
+    private static ProductionResult forge(ResidentEntity npc, Item desiredResult) {
         ProfessionData data = npc.getProfessionData();
         Container inventory = npc.getNpcInventory();
         for (BlacksmithRecipe recipe : BlacksmithRecipe.values()) {
+            if (desiredResult != Items.AIR && recipe.result != desiredResult) continue;
             ItemStack output = new ItemStack(recipe.result);
             if (recipe.level > data.level() || !hasIngredients(inventory, recipe) || !canFit(inventory, output)) continue;
             recipe.ingredients.forEach(ingredient -> remove(inventory, ingredient.item(), ingredient.count()));
@@ -207,7 +217,12 @@ public final class ProfessionService {
     private static void damageTool(ResidentEntity npc) {
         NpcProfession profession = npc.getProfessionData().profession();
         if (!profession.requiresTool()) return;
-        int slot = findTool(npc, profession.requiredTool());
+        Item toolItem = profession.requiredTool();
+        int slot = findTool(npc, toolItem);
+        if (slot == -1 && profession == NpcProfession.COOK) {
+            toolItem = com.sam.realmfolk.content.ModItems.KITCHEN_KNIFE.get();
+            slot = findTool(npc, toolItem);
+        }
         if (slot == -1) return;
         ItemStack tool = slot == -2 ? npc.getMainHandItem() : npc.getNpcInventory().getItem(slot);
         if (!tool.isDamageableItem()) return;

@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:cookie" },
+    { "item": "minecraft:paper" }
+  ],
+  "result": { "item": "realmfolk:simple_gift", "count": 1 }
+}
