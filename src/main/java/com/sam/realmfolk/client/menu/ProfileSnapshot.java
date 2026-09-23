@@ -10,6 +10,7 @@ import java.util.UUID;
 public record ProfileSnapshot(UUID personId, String name, String house, String gender,
                               String lifeStage, boolean alive, int affinity, int knowledge,
                               String father, String mother, String spouse, int children,
+                              String familyState,
                               boolean loaded, boolean canLocate, int age, String profession,
                               String personality, String morality, String origin, String residence,
                               String lastInteraction, int strength, int intelligence, int charisma, int courage) {
@@ -26,6 +27,7 @@ public record ProfileSnapshot(UUID personId, String name, String house, String g
                 relative(society, person.getFatherId(), "Desconhecido"),
                 relative(society, person.getMotherId(), "Desconhecida"),
                 relative(society, person.getSpouseId(), "Nenhum"), person.getChildrenIds().size(),
+                familyState(person, gameTime),
                 loaded, loaded && (affinity >= 60 || recruited), person.getAge(), actualProfession,
                 person.getPersonality(), person.getMorality(), person.getOrigin(), person.getResidence(),
                 interactionLabel(person.getLastInteractionTime(), gameTime), person.getStrength(),
@@ -39,7 +41,7 @@ public record ProfileSnapshot(UUID personId, String name, String house, String g
     public void write(FriendlyByteBuf b) {
         b.writeUUID(personId); b.writeUtf(name); b.writeUtf(house); b.writeUtf(gender); b.writeUtf(lifeStage);
         b.writeBoolean(alive); b.writeInt(affinity); b.writeVarInt(knowledge);
-        b.writeUtf(father); b.writeUtf(mother); b.writeUtf(spouse); b.writeVarInt(children);
+        b.writeUtf(father); b.writeUtf(mother); b.writeUtf(spouse); b.writeVarInt(children); b.writeUtf(familyState);
         b.writeBoolean(loaded); b.writeBoolean(canLocate);
         b.writeVarInt(age); b.writeUtf(profession); b.writeUtf(personality); b.writeUtf(morality);
         b.writeUtf(origin); b.writeUtf(residence); b.writeUtf(lastInteraction);
@@ -49,7 +51,7 @@ public record ProfileSnapshot(UUID personId, String name, String house, String g
     public static ProfileSnapshot read(FriendlyByteBuf b) {
         return new ProfileSnapshot(b.readUUID(), b.readUtf(), b.readUtf(), b.readUtf(), b.readUtf(),
                 b.readBoolean(), b.readInt(), b.readVarInt(), b.readUtf(), b.readUtf(), b.readUtf(),
-                b.readVarInt(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readUtf(), b.readUtf(),
+                b.readVarInt(), b.readUtf(), b.readBoolean(), b.readBoolean(), b.readVarInt(), b.readUtf(), b.readUtf(),
                 b.readUtf(), b.readUtf(), b.readUtf(), b.readUtf(), b.readVarInt(), b.readVarInt(),
                 b.readVarInt(), b.readVarInt());
     }
@@ -58,5 +60,12 @@ public record ProfileSnapshot(UUID personId, String name, String house, String g
         if (last < 0) return "Nunca";
         long days = Math.max(0, (now - last) / 24000L);
         return days == 0 ? "Hoje" : days == 1 ? "Ontem" : "Ha " + days + " dias";
+    }
+
+    private static String familyState(PersonData person, long now) {
+        if (!person.isPregnant()) return "";
+        long ticks = Math.max(0L, person.getPregnancyDueGameTime() - now);
+        long days = (ticks + 23999L) / 24000L;
+        return days == 0L ? "Parto aguardando casa" : "Gravidez: " + days + "d";
     }
 }

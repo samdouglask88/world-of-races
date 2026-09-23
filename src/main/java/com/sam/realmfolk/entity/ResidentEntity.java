@@ -8,13 +8,23 @@ import com.sam.realmfolk.society.HouseRegistry;
 import com.sam.realmfolk.society.HumanSocietySavedData;
 import com.sam.realmfolk.society.LifeStage;
 import com.sam.realmfolk.society.PersonData;
+import com.sam.realmfolk.society.settlement.Settlement;
+import com.sam.realmfolk.society.settlement.SettlementManager;
+import com.sam.realmfolk.society.settlement.SettlementSavedData;
 import com.sam.realmfolk.util.NameGenerator;
 import com.sam.realmfolk.profession.ProfessionAptitude;
 import com.sam.realmfolk.profession.ProfessionData;
 import com.sam.realmfolk.profession.blacksmith.BlacksmithWorkGoal;
+import com.sam.realmfolk.society.ai.NpcBrain;
+import com.sam.realmfolk.society.ai.SleepAtHomeGoal;
+import com.sam.realmfolk.society.ai.WorkOrderGoal;
+import com.sam.realmfolk.society.needs.NpcNeeds;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,6 +42,8 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
@@ -57,7 +69,10 @@ import java.util.Map;
 import java.util.UUID;
 
 public class ResidentEntity extends PathfinderMob implements MenuProvider, Merchant {
+    private static final EntityDataAccessor<Integer> DATA_LIFE_STAGE =
+            SynchedEntityData.defineId(ResidentEntity.class, EntityDataSerializers.INT);
     @Nullable private UUID personId;
+    @Nullable private UUID settlementId;
     private String firstName;
     private boolean isMale;
     @Nullable private ResourceLocation houseId;
@@ -72,6 +87,12 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
     private MerchantOffers merchantOffers;
     private int merchantXp;
     private ProfessionData professionData;
+    private NpcNeeds needs = new NpcNeeds();
+    private final NpcBrain npcBrain = new NpcBrain();
+    @Nullable private UUID currentWorkOrderId;
+    private int nextBrainTick;
+    private int nextNeedsTick;
+    @Nullable private BlockPos birthHomePosition;
 
     public ResidentEntity(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
@@ -88,19 +109,29 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.25D)
-                .add(Attributes.FOLLOW_RANGE, 16.0D);
+                .add(Attributes.FOLLOW_RANGE, 24.0D)
+                .add(Attributes.ATTACK_DAMAGE, 3.0D);
+    }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_LIFE_STAGE, LifeStage.ADULT.ordinal());
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new FollowAssignedPlayerGoal());
-        this.goalSelector.addGoal(2, new ReturnToStayPositionGoal());
-        this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.15D, true));
-        this.goalSelector.addGoal(4, new BlacksmithWorkGoal(this));
-        this.goalSelector.addGoal(5, new WanderWhenFreeGoal());
-        this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(1, new ReturnHomeForBirthGoal());
+        this.goalSelector.addGoal(2, new SleepAtHomeGoal(this));
+        this.goalSelector.addGoal(3, new WorkOrderGoal(this));
+        this.goalSelector.addGoal(4, new FollowAssignedPlayerGoal());
+        this.goalSelector.addGoal(5, new ReturnToStayPositionGoal());
+        this.goalSelector.addGoal(6, new MeleeAttackGoal(this, 1.15D, true));
+        this.goalSelector.addGoal(7, new BlacksmithWorkGoal(this));
+        this.goalSelector.addGoal(8, new WanderWhenFreeGoal());
+        this.goalSelector.addGoal(9, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Monster.class, true) {
             @Override
             public boolean canUse() {
@@ -140,7 +171,8 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
                 .map(key -> key.location().getPath().replace('_', ' ')).orElse("regiao desconhecida");
         manager.setInitialLocation(person.getPersonId(), biome,
                 "X " + this.blockPosition().getX() + ", Z " + this.blockPosition().getZ());
-        applyPerson(person);
+        applyPersonData(person);
+        if (settlementId != null) SettlementManager.validateMembership(serverLevel, this);
     }
 
     @Override
@@ -162,8 +194,28 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
     public void die(DamageSource source) {
         if (this.level() instanceof ServerLevel serverLevel && this.personId != null) {
             HumanSocietySavedData society = HumanSocietySavedData.get(serverLevel);
-            if (society.getPerson(this.personId).isPresent()) new FamilyManager(society).markDeceased(this.personId);
+            PersonData deceased = society.getPerson(this.personId).orElse(null);
+            if (deceased != null) {
+                FamilyManager families = new FamilyManager(society);
+                if (deceased.isPregnant()) families.finishPregnancy(this.personId, Long.MAX_VALUE);
+                families.markDeceased(this.personId);
+            }
             com.sam.realmfolk.profession.ProfessionService.remove(serverLevel,this);
+            if (settlementId != null) {
+                SettlementSavedData settlements = SettlementSavedData.get(serverLevel.getServer());
+                Settlement settlement = settlements.get(settlementId).orElse(null);
+                if (settlement != null) {
+                    if (currentWorkOrderId != null) {
+                        settlement.taskBoard().get(currentWorkOrderId).ifPresent(com.sam.realmfolk.society.task.WorkOrder::release);
+                        settlement.releaseStorageReservations(currentWorkOrderId);
+                        currentWorkOrderId = null;
+                    }
+                    boolean wasLeader = this.personId.equals(settlement.leaderId());
+                    settlement.removeMember(this.personId);
+                    if (wasLeader) SettlementManager.selectLeader(serverLevel, settlement);
+                    settlements.changed();
+                }
+            }
         }
         super.die(source);
     }
@@ -177,11 +229,76 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         return personId;
     }
 
+    @Nullable
+    public UUID getSettlementId() { return settlementId; }
+
+    public void setSettlementId(@Nullable UUID value) {
+        settlementId = value;
+        setPersistenceRequired();
+    }
+
     public SimpleContainer getNpcInventory() {
         return npcInventory;
     }
 
     public ProfessionData getProfessionData(){return professionData;}
+
+    public NpcNeeds getNeeds() { return needs; }
+    public NpcBrain getNpcBrain() { return npcBrain; }
+    @Nullable public UUID getCurrentWorkOrderId() { return currentWorkOrderId; }
+    public void setCurrentWorkOrderId(@Nullable UUID value) { currentWorkOrderId = value; }
+    @Nullable public BlockPos getBirthHomePosition() { return birthHomePosition; }
+    public void setBirthHomePosition(@Nullable BlockPos value) {
+        birthHomePosition = value == null ? null : value.immutable();
+        if (birthHomePosition != null && currentWorkOrderId != null && level() instanceof ServerLevel level
+                && settlementId != null) {
+            SettlementSavedData.get(level.getServer()).get(settlementId)
+                    .ifPresent(settlement -> com.sam.realmfolk.society.task.TaskManager.releaseCurrent(settlement, this));
+        }
+    }
+
+    public LifeStage getLifeStage() {
+        int ordinal = this.entityData.get(DATA_LIFE_STAGE);
+        LifeStage[] values = LifeStage.values();
+        return ordinal >= 0 && ordinal < values.length ? values[ordinal] : LifeStage.ADULT;
+    }
+
+    public boolean isMale() { return isMale; }
+
+    @Override
+    public boolean isBaby() { return getLifeStage() == LifeStage.BABY; }
+
+    public boolean isWorkingAge() {
+        LifeStage stage = getLifeStage();
+        return stage == LifeStage.ADULT || stage == LifeStage.ELDER;
+    }
+
+    @Override
+    public EntityDimensions getDimensions(Pose pose) {
+        EntityDimensions dimensions = super.getDimensions(pose);
+        return isBaby() ? dimensions.scale(0.5F) : getLifeStage() == LifeStage.CHILD
+                ? dimensions.scale(0.7F) : getLifeStage() == LifeStage.TEENAGER ? dimensions.scale(0.88F) : dimensions;
+    }
+
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
+        super.onSyncedDataUpdated(key);
+        if (DATA_LIFE_STAGE.equals(key)) refreshDimensions();
+    }
+
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (!(level() instanceof ServerLevel serverLevel)) return;
+        if (tickCount >= nextNeedsTick) {
+            needs.update(serverLevel.getGameTime());
+            nextNeedsTick = tickCount + 100 + random.nextInt(101);
+        }
+        if (tickCount >= nextBrainTick) {
+            npcBrain.evaluate(serverLevel, this);
+            nextBrainTick = tickCount + 20 + random.nextInt(21);
+        }
+    }
 
     public SimpleContainer getTradeInventory() {
         ensureTradeStock();
@@ -211,6 +328,7 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         if (personId != null) tag.putUUID("PersonId", personId);
+        if (settlementId != null) tag.putUUID("SettlementId", settlementId);
         tag.putString("FirstName", firstName);
         tag.putBoolean("IsMale", isMale);
         if (houseId != null) tag.putString("HouseId", houseId.toString());
@@ -223,12 +341,17 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         if (merchantOffers != null) tag.put("MerchantOffers", merchantOffers.createTag());
         tag.putInt("MerchantXp", merchantXp);
         tag.put("ProfessionData",professionData.save());
+        tag.put("Needs", needs.save());
+        if (currentWorkOrderId != null) tag.putUUID("CurrentWorkOrderId", currentWorkOrderId);
+        if (birthHomePosition != null) tag.putLong("BirthHomePosition", birthHomePosition.asLong());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         if (tag.hasUUID("PersonId")) this.personId = tag.getUUID("PersonId");
+        this.settlementId = tag.hasUUID("SettlementId") ? tag.getUUID("SettlementId") : null;
+        boolean forcedGender = tag.getBoolean(com.sam.realmfolk.content.item.GenderedResidentSpawnEggItem.FORCED_GENDER_TAG);
         if (tag.contains("IsMale")) this.isMale = tag.getBoolean("IsMale");
         if (tag.contains("HouseId")) {
             this.houseId = new ResourceLocation(tag.getString("HouseId"));
@@ -258,8 +381,13 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         }
         this.merchantXp = tag.getInt("MerchantXp");
         if(tag.contains("ProfessionData",Tag.TAG_COMPOUND))this.professionData=ProfessionData.load(tag.getCompound("ProfessionData"),professionData.aptitude());
+        if (tag.contains("Needs", Tag.TAG_COMPOUND)) this.needs = NpcNeeds.load(tag.getCompound("Needs"));
+        this.currentWorkOrderId = tag.hasUUID("CurrentWorkOrderId") ? tag.getUUID("CurrentWorkOrderId") : null;
+        this.birthHomePosition = tag.contains("BirthHomePosition") ? BlockPos.of(tag.getLong("BirthHomePosition")) : null;
         if (tag.contains("FirstName")) {
             this.firstName = tag.getString("FirstName");
+        } else if (forcedGender && this.personId == null) {
+            this.firstName = NameGenerator.generateFirstName(this.isMale);
         } else if (this.getCustomName() != null) {
             String oldName = this.getCustomName().getString();
             String surname = this.houseId == null ? null
@@ -271,10 +399,18 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         updateDisplayName();
     }
 
-    private void applyPerson(PersonData person) {
+    public void initializePerson(PersonData person) {
+        this.personId = person.getPersonId();
+        applyPersonData(person);
+        this.setPersistenceRequired();
+    }
+
+    public void applyPersonData(PersonData person) {
         this.firstName = person.getFirstName();
         this.houseId = person.getHouseId();
         this.isMale = person.getGender() == Gender.MALE;
+        this.entityData.set(DATA_LIFE_STAGE, person.getLifeStage().ordinal());
+        this.refreshDimensions();
         this.setCustomName(Component.literal(person.getDisplayName()));
     }
 
@@ -414,7 +550,31 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
 
         @Override
         public boolean canUse() {
-            return behaviorMode == NpcBehaviorMode.WANDER && super.canUse();
+            return birthHomePosition == null && behaviorMode == NpcBehaviorMode.WANDER && super.canUse();
+        }
+    }
+
+    private final class ReturnHomeForBirthGoal extends Goal {
+        private ReturnHomeForBirthGoal() { setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK)); }
+
+        @Override
+        public boolean canUse() {
+            com.sam.realmfolk.society.ai.NpcAction action = npcBrain.currentAction();
+            return birthHomePosition != null && action != com.sam.realmfolk.society.ai.NpcAction.FLEE
+                    && action != com.sam.realmfolk.society.ai.NpcAction.DEFEND
+                    && birthHomePosition.distSqr(blockPosition()) > 4.0D;
+        }
+
+        @Override
+        public boolean canContinueToUse() { return canUse(); }
+
+        @Override
+        public void tick() {
+            if (birthHomePosition == null) return;
+            getNavigation().moveTo(birthHomePosition.getX() + 0.5D, birthHomePosition.getY(),
+                    birthHomePosition.getZ() + 0.5D, 1.0D);
+            getLookControl().setLookAt(birthHomePosition.getX() + 0.5D,
+                    birthHomePosition.getY() + 0.5D, birthHomePosition.getZ() + 0.5D);
         }
     }
 

@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:book" },
+    { "item": "minecraft:emerald" }
+  ],
+  "result": { "item": "realmfolk:settlement_ledger", "count": 1 }
+}

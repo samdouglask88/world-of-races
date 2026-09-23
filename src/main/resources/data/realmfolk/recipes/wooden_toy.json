@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:oak_planks" },
+    { "item": "minecraft:stick" }
+  ],
+  "result": { "item": "realmfolk:wooden_toy", "count": 1 }
+}

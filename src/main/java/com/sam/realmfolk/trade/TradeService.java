@@ -1,6 +1,7 @@
 package com.sam.realmfolk.trade;
 
 import com.sam.realmfolk.entity.ResidentEntity;
+import com.sam.realmfolk.society.settlement.SettlementSavedData;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
@@ -27,6 +28,12 @@ public final class TradeService {
         if (product.isEmpty()) stock.setItem(stockSlot, ItemStack.EMPTY);
         add(player.getInventory(), delivery);
         player.getInventory().setChanged(); stock.setChanged();
+        if (npc.getSettlementId() != null && npc.getPersonId() != null) {
+            SettlementSavedData.get(player.serverLevel().getServer()).get(npc.getSettlementId()).ifPresent(settlement -> {
+                settlement.economy().recordIncome(npc.getPersonId(), total);
+                SettlementSavedData.get(player.serverLevel().getServer()).changed();
+            });
+        }
         return Result.SUCCESS;
     }
 
@@ -51,7 +58,8 @@ public final class TradeService {
     }
 
     private static boolean valid(ServerPlayer player, ResidentEntity npc, int amount) {
-        return amount > 0 && amount <= 64 && npc.isAlive() && npc.distanceToSqr(player) <= 64;
+        return amount > 0 && amount <= 64 && npc.isAlive() && npc.isWorkingAge()
+                && npc.distanceToSqr(player) <= 64;
     }
     private static int safeTotal(int price, int amount) {
         long total = (long) price * amount; return total > Integer.MAX_VALUE ? -1 : (int) total;

@@ -54,6 +54,11 @@ public final class HumanSocietySavedData extends SavedData {
         setDirty();
     }
 
+    void removePerson(UUID personId) {
+        people.remove(personId);
+        setDirty();
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag) {
         ListTag peopleTag = new ListTag();

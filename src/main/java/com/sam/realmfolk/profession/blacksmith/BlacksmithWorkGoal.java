@@ -30,6 +30,7 @@ public final class BlacksmithWorkGoal extends Goal {
     @Override
     public boolean canUse() {
         if (!(npc.level() instanceof ServerLevel level) || !npc.isAlive()
+                || npc.getSettlementId() != null
                 || npc.getBehaviorMode() != NpcBehaviorMode.WANDER || npc.getTarget() != null) return false;
         long time = level.getDayTime() % 24000;
         if (time < DAY_START || time > DAY_END) return false;

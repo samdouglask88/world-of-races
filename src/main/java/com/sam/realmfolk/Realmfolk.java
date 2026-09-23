@@ -3,6 +3,7 @@ package com.sam.realmfolk;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -16,6 +17,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -59,12 +61,13 @@ public class Realmfolk
     public static final RegistryObject<Item> EXAMPLE_ITEM = ITEMS.register("example_item", () -> new Item(new Item.Properties().food(new FoodProperties.Builder()
             .alwaysEat().nutrition(1).saturationMod(2f).build())));
 
-    // Creates a creative tab with the id "examplemod:example_tab" for the example item, that is placed after the combat tab
-    public static final RegistryObject<CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder()
+    public static final RegistryObject<CreativeModeTab> REALMFOLK_TAB = CREATIVE_MODE_TABS.register("realmfolk", () -> CreativeModeTab.builder()
             .withTabsBefore(CreativeModeTabs.COMBAT)
-            .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
+            .title(Component.translatable("itemGroup.realmfolk"))
+            .icon(() -> com.sam.realmfolk.content.ModItems.SETTLEMENT_LEDGER.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
-                output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
+                com.sam.realmfolk.content.ModItems.ALL.forEach(item -> output.accept(item.get()));
+                output.accept(com.sam.realmfolk.profession.ModProfessionItems.BLACKSMITH_HAMMER.get());
             }).build());
 
     public Realmfolk(FMLJavaModLoadingContext context)
@@ -79,6 +82,8 @@ public class Realmfolk
         BLOCKS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so items get registered
         com.sam.realmfolk.profession.ModProfessionItems.bootstrap();
+        com.sam.realmfolk.content.ModBlocks.bootstrap();
+        com.sam.realmfolk.content.ModItems.bootstrap();
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
@@ -87,6 +92,8 @@ public class Realmfolk
 
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
+        MinecraftForge.EVENT_BUS.register(new com.sam.realmfolk.society.SettlementEvents());
+        MinecraftForge.EVENT_BUS.register(new com.sam.realmfolk.integration.HostileMobIntegration());
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
@@ -116,8 +123,10 @@ public class Realmfolk
     // Add the example block item to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event)
     {
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS)
-            event.accept(EXAMPLE_BLOCK_ITEM);
+        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+            com.sam.realmfolk.content.ModItems.ALL.forEach(item -> event.accept(item.get()));
+            event.accept(com.sam.realmfolk.profession.ModProfessionItems.BLACKSMITH_HAMMER.get());
+        }
     }
 
     // You can use SubscribeEvent and let the Event Bus discover methods to call
@@ -129,8 +138,14 @@ public class Realmfolk
     }
 
     @SubscribeEvent
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        com.sam.realmfolk.command.RealmfolkCommands.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
     public void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(com.sam.realmfolk.dialogue.DialogueRegistry.INSTANCE);
+        event.addListener(com.sam.realmfolk.society.construction.BlueprintLoader.INSTANCE);
     }
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
@@ -171,6 +186,10 @@ public class Realmfolk
                 net.minecraft.client.gui.screens.MenuScreens.register(
                     com.sam.realmfolk.client.menu.ModMenuTypes.PROFESSION_MENU.get(),
                     com.sam.realmfolk.client.gui.ProfessionScreen::new
+                );
+                net.minecraft.client.gui.screens.MenuScreens.register(
+                    com.sam.realmfolk.client.menu.ModMenuTypes.DOCUMENT_MENU.get(),
+                    com.sam.realmfolk.client.gui.DocumentScreen::new
                 );
             });
         }

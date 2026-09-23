@@ -24,11 +24,13 @@ public enum NpcProfession {
     BLACKSMITH("blacksmith", "Ferreiro", ProfessionCategory.PRODUCTION, "Produz armas, ferramentas e armaduras.", true,
             () -> Blocks.ANVIL, () -> ModProfessionItems.BLACKSMITH_HAMMER.get(), "Bigorna", "Martelo de ferreiro"),
     COOK("cook", "Cozinheiro", ProfessionCategory.PRODUCTION, "Prepara refeições usando os ingredientes recebidos.", true,
-            () -> Blocks.SMOKER, () -> Items.BOWL, "Defumador", "Tigela"),
+            () -> Blocks.SMOKER, () -> com.sam.realmfolk.content.ModItems.COOK_LADLE.get(),
+            "Defumador", "Concha ou faca de cozinha"),
     MERCHANT("merchant", "Comerciante", ProfessionCategory.SERVICES, "Organiza o estoque e negocia mercadorias.", true,
             () -> Blocks.LECTERN, () -> Items.AIR, "Atril", "Nenhuma"),
     BUILDER("builder", "Construtor", ProfessionCategory.SERVICES, "Transforma materiais em blocos de construção.", true,
-            () -> Blocks.STONECUTTER, () -> Items.IRON_PICKAXE, "Cortador de pedra", "Picareta de ferro"),
+            () -> Blocks.STONECUTTER, () -> com.sam.realmfolk.content.ModItems.BUILDER_HAMMER.get(),
+            "Cortador de pedra", "Martelo de construtor"),
     GUARD("guard", "Guarda", ProfessionCategory.MILITARY, "Protege habitantes e enfrenta criaturas hostis.", true,
             () -> Blocks.BELL, () -> Items.IRON_SWORD, "Sino", "Espada de ferro");
 

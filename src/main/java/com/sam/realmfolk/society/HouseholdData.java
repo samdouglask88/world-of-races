@@ -43,6 +43,11 @@ public final class HouseholdData {
         addMember(personId);
     }
 
+    public void removeChild(UUID personId) {
+        childrenIds.remove(personId);
+        memberIds.remove(personId);
+    }
+
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
         tag.putUUID("HouseholdId", householdId);

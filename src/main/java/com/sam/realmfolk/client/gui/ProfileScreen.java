@@ -74,8 +74,8 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
         drawFitted(g, p.name(), 88, 158, 92, GOLD);
         drawFitted(g, "Humano | " + (p.house().equals("Sem Casa") ? "Plebeu" : "Nobre"), 88, 174, 92, TEXT);
         g.drawString(font, p.alive() ? "Vivo" : "Falecido", 88, 192, p.alive() ? 0xFF55DD55 : 0xFFE05B5B, false);
-        g.drawString(font, reveal(p, 1, stage(p.lifeStage())), 88, 211, TEXT, false);
-        g.drawString(font, reveal(p, 1, p.gender().equals("MALE") ? "Masculino" : "Feminino"), 88, 228, TEXT, false);
+        g.drawString(font, stage(p.lifeStage()), 88, 211, TEXT, false);
+        g.drawString(font, p.gender().equals("MALE") ? "Masculino" : "Feminino", 88, 228, TEXT, false);
         g.drawString(font, affinity(p.affinity()), 88, 267, GOLD, false);
         g.drawCenteredString(font, p.affinity() + " / 100", 134, 299, MUTED);
 
@@ -90,7 +90,8 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
         line(g, "Pai", reveal(p, 2, p.father()), 204, 242);
         line(g, "Mãe", reveal(p, 2, p.mother()), 204, 253);
         line(g, "Cônjuge", reveal(p, 2, p.spouse()), 204, 264);
-        line(g, "Filhos", reveal(p, 2, Integer.toString(p.children())), 204, 275);
+        String family = Integer.toString(p.children()) + (p.familyState().isBlank() ? "" : " | " + p.familyState());
+        line(g, "Filhos", reveal(p, 2, family), 204, 275);
 
         title(g, "Histórico", 384, 94);
         line(g, "Casa", reveal(p, 2, p.house()), 384, 116);
@@ -106,7 +107,9 @@ public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
         g.drawCenteredString(font, knowledgeText(p.knowledge()), W / 2, 328, MUTED);
     }
 
-    private static String reveal(ProfileSnapshot p, int level, String value) { return p.knowledge() >= level ? value : "???"; }
+    private static String reveal(ProfileSnapshot p, int level, String value) {
+        return p.knowledge() >= level ? value : "Não descoberto";
+    }
     private static String stage(String value) { return switch (value) { case "BABY" -> "Bebe"; case "CHILD" -> "Crianca"; case "TEENAGER" -> "Adolescente"; case "ELDER" -> "Idoso"; default -> "Adulto"; }; }
     private static String affinity(int v) { return v < -19 ? "Desconfiado" : v < 20 ? "Neutro" : v < 60 ? "Amigavel" : "Aliado"; }
     private static String knowledgeText(int k) { return switch (k) { case 0 -> "Converse para conhecer este habitante"; case 1 -> "Informacoes basicas descobertas"; case 2 -> "Informacoes pessoais descobertas"; default -> "Perfil conhecido"; }; }

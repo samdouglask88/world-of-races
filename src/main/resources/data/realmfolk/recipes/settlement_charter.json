@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:paper" },
+    { "item": "minecraft:feather" },
+    { "item": "minecraft:emerald" }
+  ],
+  "result": { "item": "realmfolk:settlement_charter", "count": 1 }
+}
