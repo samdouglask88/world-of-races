@@ -4,6 +4,14 @@ import com.sam.realmfolk.entity.ResidentEntity;
 import com.sam.realmfolk.profession.NpcProfession;
 import com.sam.realmfolk.profession.ProfessionService;
 import com.sam.realmfolk.profession.blacksmith.BlacksmithRecipe;
+import com.sam.realmfolk.profession.forestry.ForestryManager;
+import com.sam.realmfolk.profession.farming.FarmingManager;
+import com.sam.realmfolk.profession.mining.MiningManager;
+import com.sam.realmfolk.profession.cooking.CookingManager;
+import com.sam.realmfolk.profession.fishing.FishingManager;
+import com.sam.realmfolk.profession.hunting.HuntingManager;
+import com.sam.realmfolk.profession.merchant.MerchantManager;
+import com.sam.realmfolk.profession.guard.GuardManager;
 import com.sam.realmfolk.society.HumanSocietySavedData;
 import com.sam.realmfolk.society.LifeStage;
 import com.sam.realmfolk.society.settlement.Settlement;
@@ -49,9 +57,13 @@ public final class TaskManager {
         SettlementStorage storage = new SettlementStorage(level, settlement);
         return switch (order.type()) {
             case PRODUCE_RESOURCE -> canProduce(level, settlement, storage, resident, order);
-            case BUILD, REPAIR -> isAdult(level, resident)
-                    && (profession == NpcProfession.BUILDER || profession == NpcProfession.NONE);
-            case GUARD -> profession == NpcProfession.GUARD;
+            case BUILD, REPAIR -> isAdult(level, resident) && (profession == NpcProfession.NONE
+                    || (profession == NpcProfession.BUILDER
+                    && ProfessionService.validateOrFindStation(level, resident)
+                    && ProfessionService.hasRequiredTool(resident)));
+            case GUARD -> GuardManager.canPerform(level, settlement, resident, order);
+            case DELIVER_RESOURCE -> MerchantManager.isStockOrder(order)
+                    ? MerchantManager.canPerform(level, settlement, resident, order) : true;
             case FETCH_FOOD -> storage.countFood() > 0;
             case FETCH_TOOL -> !ProfessionService.hasRequiredTool(resident)
                     && profession.requiredTool() != Items.AIR && storage.count(profession.requiredTool()) > 0;
@@ -79,6 +91,24 @@ public final class TaskManager {
 
     private static boolean canProduce(ServerLevel level, Settlement settlement, SettlementStorage storage,
                                       ResidentEntity resident, WorkOrder order) {
+        if (ForestryManager.isForestryOrder(order)) {
+            return ForestryManager.canPerform(level, settlement, resident, order);
+        }
+        if (FarmingManager.isFarmingOrder(order)) {
+            return FarmingManager.canPerform(level, settlement, resident, order);
+        }
+        if (MiningManager.isMiningOrder(order)) {
+            return MiningManager.canPerform(level, settlement, resident, order);
+        }
+        if (CookingManager.isCookingOrder(order)) {
+            return CookingManager.canPerform(level, settlement, resident, order);
+        }
+        if (FishingManager.isFishingOrder(order)) {
+            return FishingManager.canPerform(level, settlement, resident, order);
+        }
+        if (HuntingManager.isHuntingOrder(order)) {
+            return HuntingManager.canPerform(level, settlement, resident, order);
+        }
         if (resident.getProfessionData().profession() != NpcProfession.BLACKSMITH
                 || resident.getProfessionData().workstation() == null
                 || !level.hasChunkAt(resident.getProfessionData().workstation())
@@ -95,7 +125,20 @@ public final class TaskManager {
 
     private static boolean reserveResources(ServerLevel level, Settlement settlement,
                                             ResidentEntity resident, WorkOrder order) {
+        if (MerchantManager.isStockOrder(order)) {
+            return MerchantManager.reserveStock(level, settlement, order);
+        }
         if (order.type() != WorkOrderType.PRODUCE_RESOURCE) return true;
+        if (ForestryManager.isForestryOrder(order)) return true;
+        if (FarmingManager.isFarmingOrder(order)) return true;
+        if (MiningManager.isMiningOrder(order)) return true;
+        if (CookingManager.isCookingOrder(order)) {
+            return CookingManager.reserveIngredients(level, settlement, resident, order);
+        }
+        if (FishingManager.isFishingOrder(order)) return true;
+        if (HuntingManager.isHuntingOrder(order)) {
+            return HuntingManager.reserveAmmunition(level, settlement, resident, order);
+        }
         BlacksmithRecipe recipe = BlacksmithRecipe.forResult(order.result()).orElse(null);
         if (recipe == null) return false;
         SettlementStorage storage = new SettlementStorage(level, settlement);

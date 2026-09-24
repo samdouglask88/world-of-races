@@ -2,6 +2,8 @@ package com.sam.realmfolk.society.construction;
 
 import com.sam.realmfolk.Realmfolk;
 import com.sam.realmfolk.entity.ResidentEntity;
+import com.sam.realmfolk.profession.NpcProfession;
+import com.sam.realmfolk.profession.ProfessionService;
 import com.sam.realmfolk.society.settlement.Settlement;
 import com.sam.realmfolk.society.settlement.SettlementSavedData;
 import com.sam.realmfolk.society.storage.SettlementStorage;
@@ -42,6 +44,8 @@ public final class ConstructionManager {
     }
 
     public static WorkResult workProject(ServerLevel level, Settlement settlement, ResidentEntity resident) {
+        if (resident != null && resident.getProfessionData().profession() == NpcProfession.BUILDER
+                && !ProfessionService.hasRequiredTool(resident)) return WorkResult.NO_TOOL;
         ConstructionProject project = settlement.projects().stream()
                 .filter(value -> value.stage() != ConstructionStage.COMPLETED && value.stage() != ConstructionStage.CANCELLED)
                 .findFirst().orElse(null);
@@ -83,6 +87,10 @@ public final class ConstructionManager {
             }
             project.setBlockIndex(project.blockIndex() + 1);
             placed++;
+            if (resident != null && resident.getProfessionData().profession() == NpcProfession.BUILDER) {
+                ProfessionService.damageRequiredTool(resident);
+                resident.getProfessionData().addExperience(5);
+            }
             updateStage(project, blueprint);
         }
         if (project.blockIndex() >= blueprint.blocks().size()) {
@@ -236,6 +244,6 @@ public final class ConstructionManager {
                 : progress < 0.85D ? ConstructionStage.STRUCTURE : ConstructionStage.FINISHING);
     }
 
-    public enum WorkResult { IN_PROGRESS, COMPLETED, WAITING_RESOURCES, UNLOADED, BLOCKED }
+    public enum WorkResult { IN_PROGRESS, COMPLETED, WAITING_RESOURCES, UNLOADED, NO_TOOL, BLOCKED }
     public enum PlanResult { SUCCESS, BLUEPRINT_MISSING, LEVEL_TOO_LOW, UNSAFE_SITE, OVERLAPS_PROJECT }
 }

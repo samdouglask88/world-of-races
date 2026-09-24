@@ -307,15 +307,6 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
 
     private void ensureTradeStock() {
         if (tradeStockInitialized) return;
-        tradeInventory.setItem(0, new ItemStack(Items.EMERALD, 48));
-        tradeInventory.setItem(1, new ItemStack(Items.BREAD, 24));
-        tradeInventory.setItem(2, new ItemStack(Items.WHEAT, 32));
-        tradeInventory.setItem(3, new ItemStack(Items.COOKED_BEEF, 16));
-        tradeInventory.setItem(4, new ItemStack(Items.IRON_INGOT, 12));
-        tradeInventory.setItem(5, new ItemStack(Items.COAL, 24));
-        tradeInventory.setItem(6, new ItemStack(Items.ARROW, 32));
-        tradeInventory.setItem(7, new ItemStack(Items.IRON_SWORD, 2));
-        tradeInventory.setItem(8, new ItemStack(Items.LEATHER_CHESTPLATE, 2));
         tradeStockInitialized = true;
     }
 
@@ -354,7 +345,7 @@ public class ResidentEntity extends PathfinderMob implements MenuProvider, Merch
         boolean forcedGender = tag.getBoolean(com.sam.realmfolk.content.item.GenderedResidentSpawnEggItem.FORCED_GENDER_TAG);
         if (tag.contains("IsMale")) this.isMale = tag.getBoolean("IsMale");
         if (tag.contains("HouseId")) {
-            this.houseId = new ResourceLocation(tag.getString("HouseId"));
+            this.houseId = ResourceLocation.tryParse(tag.getString("HouseId"));
         } else if (tag.contains("NobleSurname")) {
             this.houseId = HouseRegistry.getBySurname(tag.getString("NobleSurname")).map(House::id).orElse(null);
         } else {

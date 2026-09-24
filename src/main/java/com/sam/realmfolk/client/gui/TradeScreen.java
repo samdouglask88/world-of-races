@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 public final class TradeScreen extends AbstractContainerScreen<TradeMenu> {
-    private static final ResourceLocation FRAME=new ResourceLocation(Realmfolk.MODID,"textures/gui/npc_menu_frame.png");
+    private static final ResourceLocation FRAME=ResourceLocation.fromNamespaceAndPath(Realmfolk.MODID,"textures/gui/npc_menu_frame.png");
     private static final int W=640,H=360,TW=1672,TH=941,GOLD=0xFFF0D08A,TEXT=0xFFE8E2D8,MUTED=0xFFAAA79F;
     private float scale=1; private Filter filter=Filter.ALL; private TradeButton confirm;
     public TradeScreen(TradeMenu menu,Inventory inventory,Component title){super(menu,inventory,title);imageWidth=W;imageHeight=H;titleLabelY=inventoryLabelY=-1000;}

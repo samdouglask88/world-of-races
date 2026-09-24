@@ -16,7 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 public final class ProfileScreen extends AbstractContainerScreen<ProfileMenu> {
-    private static final ResourceLocation FRAME = new ResourceLocation(Realmfolk.MODID, "textures/gui/family_tree_frame.png");
+    private static final ResourceLocation FRAME = ResourceLocation.fromNamespaceAndPath(Realmfolk.MODID, "textures/gui/family_tree_frame.png");
     private static final int W = 640, H = 360, TW = 1671, TH = 941;
     private static final int GOLD = 0xFFF0D08A, TEXT = 0xFFE8E2D8, MUTED = 0xFFAAA79F;
     private float scale = 1;

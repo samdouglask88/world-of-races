@@ -29,7 +29,7 @@ public final class ProfessionService {
         if (station.isEmpty()) return new Result(false, "Nenhuma estação livre encontrada em um raio de 32 blocos");
         remove(level, npc);
         BlockPos position = station.get();
-        if (!WorkstationSavedData.get(level.getServer()).claim(level.dimension().location(), position, npc.getUUID())) {
+        if (!WorkstationSavedData.get(level.getServer()).claimActive(level, position, npc.getUUID())) {
             return new Result(false, "A estação já pertence a outro habitante");
         }
         npc.getProfessionData().assign(profession, position, level.dimension().location());
@@ -51,7 +51,7 @@ public final class ProfessionService {
         if (data.workstation() != null && data.dimension() != null
                 && data.dimension().equals(level.dimension().location())
                 && level.hasChunkAt(data.workstation()) && isStation(level, data.workstation(), profession)
-                && WorkstationSavedData.get(level.getServer()).claim(data.dimension(), data.workstation(), npc.getUUID())) {
+                && WorkstationSavedData.get(level.getServer()).claimActive(level, data.workstation(), npc.getUUID())) {
             return true;
         }
         if (data.workstation() != null && data.dimension() != null) {
@@ -61,7 +61,7 @@ public final class ProfessionService {
         Optional<BlockPos> replacement = findStation(level, npc.blockPosition(), npc.getUUID(), profession);
         if (replacement.isEmpty()) return false;
         BlockPos position = replacement.get();
-        if (!WorkstationSavedData.get(level.getServer()).claim(level.dimension().location(), position, npc.getUUID())) return false;
+        if (!WorkstationSavedData.get(level.getServer()).claimActive(level, position, npc.getUUID())) return false;
         data.assign(profession, position, level.dimension().location());
         return true;
     }
@@ -73,7 +73,7 @@ public final class ProfessionService {
                 .filter(level::hasChunkAt)
                 .filter(position -> isStation(level, position, profession))
                 .filter(position -> WorkstationSavedData.get(level.getServer())
-                        .available(level.dimension().location(), position, npc))
+                        .availableActive(level, position, npc))
                 .min(Comparator.comparingDouble(position -> position.distSqr(center)))
                 .map(BlockPos::immutable);
     }
@@ -95,6 +95,18 @@ public final class ProfessionService {
                     || findTool(npc, com.sam.realmfolk.content.ModItems.KITCHEN_KNIFE.get()) != -1;
         }
         return !profession.requiresTool() || findTool(npc, profession.requiredTool()) != -1;
+    }
+
+    public static ItemStack requiredToolStack(ResidentEntity npc) {
+        NpcProfession profession = npc.getProfessionData().profession();
+        Item required = profession.requiredTool();
+        int slot = findTool(npc, required);
+        if (slot == -1 && profession == NpcProfession.COOK) {
+            required = com.sam.realmfolk.content.ModItems.KITCHEN_KNIFE.get();
+            slot = findTool(npc, required);
+        }
+        if (slot == -2) return npc.getMainHandItem();
+        return slot >= 0 ? npc.getNpcInventory().getItem(slot) : ItemStack.EMPTY;
     }
 
     private static int findTool(ResidentEntity npc, Item item) {
@@ -123,53 +135,18 @@ public final class ProfessionService {
         NpcProfession profession = npc.getProfessionData().profession();
         if (!hasRequiredTool(npc)) return ProductionResult.NO_TOOL;
         return switch (profession) {
-            case FARMER -> craft(npc, Items.WHEAT_SEEDS, 1, Items.WHEAT, 2, 10);
-            case LUMBERJACK -> gather(npc, Items.OAK_LOG, 2, 12);
-            case MINER -> mine(npc);
-            case FISHERMAN -> gather(npc, npc.getRandom().nextInt(4) == 0 ? Items.SALMON : Items.COD, 1, 12);
-            case HUNTER -> craft(npc, Items.ARROW, 1,
-                    npc.getRandom().nextBoolean() ? Items.BEEF : Items.LEATHER, 1, 14);
+            case FARMER -> ProductionResult.NO_RECIPE; // Physical farming owns crop production.
+            case LUMBERJACK -> ProductionResult.NO_RECIPE; // Physical forestry owns lumber production.
+            case MINER -> ProductionResult.NO_RECIPE; // Physical mining owns mineral production.
+            case FISHERMAN -> ProductionResult.NO_RECIPE; // Physical fishing owns aquatic production.
+            case HUNTER -> ProductionResult.NO_RECIPE; // Physical hunting owns animal drops.
             case BLACKSMITH -> forge(npc, desiredResult);
-            case COOK -> cook(npc);
-            case MERCHANT -> stockStore(npc);
-            case BUILDER -> craft(npc, Items.COBBLESTONE, 4, Items.STONE_BRICKS, 4, 16);
-            case GUARD -> gainExperience(npc, 8);
+            case COOK -> ProductionResult.NO_RECIPE; // Physical kitchen orders own food production.
+            case MERCHANT -> ProductionResult.NO_RECIPE; // Physical restocking owns merchant stock movement.
+            case BUILDER -> ProductionResult.NO_RECIPE; // Construction projects own block placement.
+            case GUARD -> ProductionResult.NO_RECIPE; // Patrol and combat own guard experience.
             default -> ProductionResult.NO_RECIPE;
         };
-    }
-
-    private static ProductionResult mine(ResidentEntity npc) {
-        int roll = npc.getRandom().nextInt(10);
-        Item output = npc.getProfessionData().level() >= 3 && roll == 0 ? Items.RAW_IRON
-                : roll < 3 ? Items.COAL : Items.COBBLESTONE;
-        return gather(npc, output, 1, output == Items.RAW_IRON ? 24 : 12);
-    }
-
-    private static ProductionResult cook(ResidentEntity npc) {
-        if (count(npc.getNpcInventory(), Items.BEEF) > 0)
-            return craft(npc, Items.BEEF, 1, Items.COOKED_BEEF, 1, 12);
-        if (count(npc.getNpcInventory(), Items.CHICKEN) > 0)
-            return craft(npc, Items.CHICKEN, 1, Items.COOKED_CHICKEN, 1, 10);
-        if (count(npc.getNpcInventory(), Items.POTATO) > 0)
-            return craft(npc, Items.POTATO, 1, Items.BAKED_POTATO, 1, 8);
-        return ProductionResult.NO_RECIPE;
-    }
-
-    private static ProductionResult stockStore(ResidentEntity npc) {
-        Container source = npc.getNpcInventory();
-        Container stock = npc.getTradeInventory();
-        for (int i = 0; i < source.getContainerSize(); i++) {
-            ItemStack stack = source.getItem(i);
-            if (stack.isEmpty() || stack.is(Items.EMERALD) || !canFit(stock, stack.copyWithCount(1))) continue;
-            ItemStack moved = stack.copyWithCount(1);
-            stack.shrink(1);
-            if (stack.isEmpty()) source.setItem(i, ItemStack.EMPTY);
-            add(stock, moved);
-            source.setChanged();
-            stock.setChanged();
-            return gainExperience(npc, 10);
-        }
-        return ProductionResult.NO_RECIPE;
     }
 
     private static ProductionResult forge(ResidentEntity npc, Item desiredResult) {
@@ -181,40 +158,18 @@ public final class ProfessionService {
             if (recipe.level > data.level() || !hasIngredients(inventory, recipe) || !canFit(inventory, output)) continue;
             recipe.ingredients.forEach(ingredient -> remove(inventory, ingredient.item(), ingredient.count()));
             add(inventory, output);
-            damageTool(npc);
+            damageRequiredTool(npc);
             inventory.setChanged();
             return gainExperience(npc, recipe.xp);
         }
         return ProductionResult.NO_RECIPE;
     }
 
-    private static ProductionResult craft(ResidentEntity npc, Item input, int inputCount,
-                                          Item output, int outputCount, int experience) {
-        Container inventory = npc.getNpcInventory();
-        ItemStack result = new ItemStack(output, outputCount);
-        if (count(inventory, input) < inputCount || !canFit(inventory, result)) return ProductionResult.NO_RECIPE;
-        remove(inventory, input, inputCount);
-        add(inventory, result);
-        damageTool(npc);
-        inventory.setChanged();
-        return gainExperience(npc, experience);
-    }
-
-    private static ProductionResult gather(ResidentEntity npc, Item output, int count, int experience) {
-        Container inventory = npc.getNpcInventory();
-        ItemStack result = new ItemStack(output, count);
-        if (!canFit(inventory, result)) return ProductionResult.NO_RECIPE;
-        add(inventory, result);
-        damageTool(npc);
-        inventory.setChanged();
-        return gainExperience(npc, experience);
-    }
-
     private static ProductionResult gainExperience(ResidentEntity npc, int amount) {
         return npc.getProfessionData().addExperience(amount) ? ProductionResult.LEVEL_UP : ProductionResult.SUCCESS;
     }
 
-    private static void damageTool(ResidentEntity npc) {
+    public static void damageRequiredTool(ResidentEntity npc) {
         NpcProfession profession = npc.getProfessionData().profession();
         if (!profession.requiresTool()) return;
         Item toolItem = profession.requiredTool();

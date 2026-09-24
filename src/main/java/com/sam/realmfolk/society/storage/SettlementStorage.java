@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 public final class SettlementStorage {
+    public static final int PERSONAL_FOOD_RESERVE = 2;
     private final ServerLevel level;
     private final Settlement settlement;
 
@@ -141,8 +142,18 @@ public final class SettlementStorage {
     public int depositExcess(ResidentEntity resident) {
         Container source = resident.getNpcInventory();
         int moved = 0;
+        int foodSurplus = Math.max(0, countFoodItems(source) - PERSONAL_FOOD_RESERVE);
         for (int i = 0; i < source.getContainerSize(); i++) {
             ItemStack stack = source.getItem(i);
+            if (!stack.isEmpty() && stack.isEdible()) {
+                int amount = Math.min(foodSurplus, stack.getCount());
+                if (amount <= 0 || !insert(stack.copyWithCount(amount))) continue;
+                stack.shrink(amount);
+                if (stack.isEmpty()) source.setItem(i, ItemStack.EMPTY);
+                foodSurplus -= amount;
+                moved += amount;
+                continue;
+            }
             if (!isDepositable(resident, stack)) continue;
             ItemStack copy = stack.copy();
             if (!insert(copy)) continue;
@@ -162,9 +173,19 @@ public final class SettlementStorage {
     }
 
     public static boolean isDepositable(ResidentEntity resident, ItemStack stack) {
-        if (stack.isEmpty() || stack.is(Items.EMERALD) || stack.isEdible()) return false;
+        if (stack.isEmpty() || stack.is(Items.EMERALD)) return false;
+        if (stack.isEdible()) return countFoodItems(resident.getNpcInventory()) > PERSONAL_FOOD_RESERVE;
         Item requiredTool = resident.getProfessionData().profession().requiredTool();
         return requiredTool == Items.AIR || !stack.is(requiredTool);
+    }
+
+    private static int countFoodItems(Container container) {
+        int count = 0;
+        for (int i = 0; i < container.getContainerSize(); i++) {
+            ItemStack stack = container.getItem(i);
+            if (stack.isEdible()) count += stack.getCount();
+        }
+        return count;
     }
 
     @Nullable

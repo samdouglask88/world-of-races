@@ -6,6 +6,15 @@ import com.sam.realmfolk.society.settlement.Settlement;
 import com.sam.realmfolk.society.settlement.SettlementManager;
 import com.sam.realmfolk.society.settlement.SettlementSavedData;
 import com.sam.realmfolk.society.reproduction.ReproductionManager;
+import com.sam.realmfolk.profession.forestry.ForestryManager;
+import com.sam.realmfolk.profession.farming.FarmingManager;
+import com.sam.realmfolk.profession.mining.MiningManager;
+import com.sam.realmfolk.profession.cooking.CookingManager;
+import com.sam.realmfolk.profession.fishing.FishingManager;
+import com.sam.realmfolk.profession.hunting.HuntingManager;
+import com.sam.realmfolk.profession.blacksmith.BlacksmithManager;
+import com.sam.realmfolk.profession.merchant.MerchantManager;
+import com.sam.realmfolk.profession.guard.GuardManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -44,6 +53,33 @@ public final class SettlementEvents {
                 changed = true;
             }
             ConstructionManager.ensureBuildOrder(level, settlement);
+            if (level.getGameTime() % 600L == 0L && ForestryManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && FarmingManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && MiningManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && CookingManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && FishingManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && HuntingManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && BlacksmithManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && MerchantManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
+            if (level.getGameTime() % 600L == 0L && GuardManager.ensureWorkOrder(level, settlement)) {
+                changed = true;
+            }
             if (ReproductionManager.tick(level, settlement)) changed = true;
             DailyEconomyManager.run(level, settlement);
             if (changed) data.changed();

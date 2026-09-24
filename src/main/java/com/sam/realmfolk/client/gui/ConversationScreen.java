@@ -20,7 +20,7 @@ import net.minecraft.world.item.Items;
 import java.util.List;
 
 public final class ConversationScreen extends AbstractContainerScreen<ConversationMenu> {
-    private static final ResourceLocation FRAME = new ResourceLocation(Realmfolk.MODID, "textures/gui/npc_menu_frame.png");
+    private static final ResourceLocation FRAME = ResourceLocation.fromNamespaceAndPath(Realmfolk.MODID, "textures/gui/npc_menu_frame.png");
     private static final int PANEL_WIDTH = 640, PANEL_HEIGHT = 360, TEXTURE_WIDTH = 1672, TEXTURE_HEIGHT = 941;
     private static final int GOLD = 0xFFF0D08A, TEXT = 0xFFE8E2D8, MUTED = 0xFFAAA79F;
     private float panelScale = 1.0F;

@@ -6,6 +6,8 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.saveddata.SavedData;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +19,24 @@ public final class WorkstationSavedData extends SavedData {
     private static String key(ResourceLocation dim,BlockPos pos){return dim+"|"+pos.asLong();}
     public boolean claim(ResourceLocation dim,BlockPos pos,UUID npc){String key=key(dim,pos);UUID owner=owners.get(key);if(owner!=null&&!owner.equals(npc))return false;owners.put(key,npc);setDirty();return true;}
     public boolean available(ResourceLocation dim,BlockPos pos,UUID npc){UUID owner=owners.get(key(dim,pos));return owner==null||owner.equals(npc);}
+    public boolean claimActive(ServerLevel level, BlockPos pos, UUID npc) {
+        String key = key(level.dimension().location(), pos);
+        UUID owner = owners.get(key);
+        if (owner != null && !owner.equals(npc)) {
+            Entity previous = level.getEntity(owner);
+            if (previous != null && previous.isAlive()) return false;
+            owners.remove(key);
+        }
+        owners.put(key, npc);
+        setDirty();
+        return true;
+    }
+    public boolean availableActive(ServerLevel level, BlockPos pos, UUID npc) {
+        UUID owner = owners.get(key(level.dimension().location(), pos));
+        if (owner == null || owner.equals(npc)) return true;
+        Entity previous = level.getEntity(owner);
+        return previous == null || !previous.isAlive();
+    }
     public void release(ResourceLocation dim,BlockPos pos,UUID npc){String key=key(dim,pos);if(npc.equals(owners.get(key))){owners.remove(key);setDirty();}}
     @Override public CompoundTag save(CompoundTag t){ListTag list=new ListTag();owners.forEach((key,id)->{CompoundTag n=new CompoundTag();n.putString("Key",key);n.putUUID("Owner",id);list.add(n);});t.put("Claims",list);return t;}
     private static WorkstationSavedData load(CompoundTag t){WorkstationSavedData d=new WorkstationSavedData();ListTag list=t.getList("Claims",Tag.TAG_COMPOUND);for(int i=0;i<list.size();i++){CompoundTag n=list.getCompound(i);if(n.hasUUID("Owner"))d.owners.put(n.getString("Key"),n.getUUID("Owner"));}return d;}
