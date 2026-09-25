@@ -7,6 +7,17 @@ import com.sam.realmfolk.entity.ModEntityTypes;
 import com.sam.realmfolk.entity.ResidentEntity;
 import com.sam.realmfolk.integration.HostileMobIntegration;
 import com.sam.realmfolk.profession.NpcProfession;
+import com.sam.realmfolk.profession.ProfessionService;
+import com.sam.realmfolk.profession.forestry.ForestryManager;
+import com.sam.realmfolk.profession.farming.FarmingManager;
+import com.sam.realmfolk.profession.mining.MiningManager;
+import com.sam.realmfolk.profession.cooking.CookingManager;
+import com.sam.realmfolk.profession.fishing.FishingManager;
+import com.sam.realmfolk.profession.hunting.HuntingManager;
+import com.sam.realmfolk.profession.blacksmith.BlacksmithManager;
+import com.sam.realmfolk.profession.merchant.MerchantManager;
+import com.sam.realmfolk.profession.guard.GuardManager;
+import com.sam.realmfolk.profession.ModProfessionItems;
 import com.sam.realmfolk.society.economy.EconomyTransactionType;
 import com.sam.realmfolk.society.economy.DailyEconomyManager;
 import com.sam.realmfolk.society.economy.Treasury;
@@ -43,12 +54,17 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.projectile.Arrow;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -60,6 +76,488 @@ import java.util.List;
 @PrefixGameTestTemplate(false)
 public final class SettlementGameTests {
     private SettlementGameTests() {}
+
+    @GameTest(template = "empty")
+    public static void farmerHarvestsAndReplantsCarrots(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos crop = helper.absolutePos(new BlockPos(3, 1, 3));
+        helper.setBlock(new BlockPos(3, 0, 3), Blocks.FARMLAND);
+        helper.setBlock(new BlockPos(3, 1, 2), Blocks.GLOWSTONE);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Horta", crop,
+                level.dimension(), 16, level.getGameTime());
+        ResidentEntity farmer = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 3));
+        farmer.getProfessionData().assign(NpcProfession.FARMER,
+                helper.absolutePos(new BlockPos(1, 1, 1)), level.dimension().location());
+        farmer.getNpcInventory().addItem(new ItemStack(Items.IRON_HOE));
+        helper.runAfterDelay(2, () -> {
+            helper.setBlock(new BlockPos(3, 1, 3), Blocks.CARROTS.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.CarrotBlock.AGE, 7));
+            WorkOrder order = FarmingManager.createOrderAt(level, settlement, crop);
+            helper.assertTrue(order != null, "A cenoura madura não gerou ordem agrícola");
+            FarmingManager.WorkResult result = FarmingManager.workCrop(level, settlement, farmer, order);
+            helper.assertTrue(result == FarmingManager.WorkResult.COMPLETED,
+                    "O fazendeiro não colheu e replantou a cenoura: " + result);
+            helper.assertTrue(level.getBlockState(crop).is(Blocks.CARROTS)
+                            && level.getBlockState(crop).getValue(net.minecraft.world.level.block.CarrotBlock.AGE) == 0,
+                    "A cenoura não foi replantada no primeiro estágio");
+            helper.assertTrue(farmer.getNpcInventory().countItem(Items.CARROT) > 0,
+                    "A colheita de cenoura não chegou ao inventário");
+            farmer.discard();
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty")
+    public static void cookPreparesStoredPotato(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos storagePosition = helper.absolutePos(new BlockPos(4, 1, 1));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.SMOKER);
+        helper.setBlock(new BlockPos(4, 1, 1), Blocks.BARREL);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Cozinha da Horta", station,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addStorage(storagePosition);
+        Container barrel = (Container) level.getBlockEntity(storagePosition);
+        helper.assertTrue(barrel != null, "O barril de batatas não foi criado");
+        barrel.setItem(0, new ItemStack(Items.POTATO));
+        ResidentEntity cook = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 1));
+        cook.getProfessionData().assign(NpcProfession.COOK, station, level.dimension().location());
+        cook.getNpcInventory().addItem(new ItemStack(ModItems.COOK_LADLE.get()));
+        WorkOrder order = CookingManager.createOrderFor(level, settlement, station, Items.POTATO);
+        helper.assertTrue(order != null && CookingManager.collectIngredients(level, settlement, cook, order),
+                "A batata não foi retirada fisicamente do barril");
+        helper.assertTrue(CookingManager.prepareMeal(level, settlement, cook, order)
+                        == CookingManager.WorkResult.COMPLETED,
+                "O cozinheiro não assou a batata");
+        helper.assertTrue(cook.getNpcInventory().countItem(Items.BAKED_POTATO) == 1
+                        && new SettlementStorage(level, settlement).count(Items.POTATO) == 0,
+                "A receita de batata duplicou ou perdeu recursos");
+        ProfessionService.remove(level, cook);
+        cook.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void blacksmithAnswersARealToolShortage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos anvil = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos composter = helper.absolutePos(new BlockPos(2, 1, 1));
+        BlockPos storagePosition = helper.absolutePos(new BlockPos(5, 1, 4));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.ANVIL);
+        helper.setBlock(new BlockPos(2, 1, 1), Blocks.COMPOSTER);
+        helper.setBlock(new BlockPos(5, 1, 4), Blocks.BARREL);
+        Container barrel = (Container) level.getBlockEntity(storagePosition);
+        helper.assertTrue(barrel != null, "O armazém da ferraria não foi criado");
+        barrel.setItem(0, new ItemStack(Items.IRON_INGOT, 2));
+        barrel.setItem(1, new ItemStack(Items.STICK, 2));
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Ferraria", anvil,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addStorage(storagePosition);
+        ResidentEntity smith = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(1, 1, 2));
+        ResidentEntity farmer = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 2));
+        smith.setSettlementId(settlement.id());
+        farmer.setSettlementId(settlement.id());
+        settlement.addMember(smith.getPersonId(), level.getGameTime());
+        settlement.addMember(farmer.getPersonId(), level.getGameTime());
+        smith.getProfessionData().assign(NpcProfession.BLACKSMITH, anvil, level.dimension().location());
+        farmer.getProfessionData().assign(NpcProfession.FARMER, composter, level.dimension().location());
+        smith.getNpcInventory().addItem(new ItemStack(ModProfessionItems.BLACKSMITH_HAMMER.get()));
+
+        helper.assertTrue(BlacksmithManager.ensureWorkOrder(level, settlement),
+                "A falta de enxada do fazendeiro não gerou uma ordem para o ferreiro");
+        WorkOrder order = settlement.taskBoard().orders().get(0);
+        helper.assertTrue(order.result() == Items.IRON_HOE && BlacksmithManager.isBlacksmithOrder(order),
+                "A ordem da ferraria não escolheu a ferramenta ausente");
+        SettlementStorage storage = new SettlementStorage(level, settlement);
+        helper.assertTrue(storage.moveItemTo(Items.IRON_INGOT, 2, smith.getNpcInventory())
+                        && storage.moveItemTo(Items.STICK, 2, smith.getNpcInventory()),
+                "Os materiais físicos não chegaram à ferraria");
+        helper.assertTrue(ProfessionService.produce(smith, Items.IRON_HOE)
+                        != ProfessionService.ProductionResult.NO_RECIPE,
+                "O ferreiro não produziu a ferramenta solicitada");
+        helper.assertTrue(smith.getNpcInventory().countItem(Items.IRON_HOE) == 1
+                        && storage.count(Items.IRON_INGOT) == 0 && storage.count(Items.STICK) == 0,
+                "A ferramenta ou o consumo de materiais da ferraria está incorreto");
+        ProfessionService.remove(level, smith);
+        ProfessionService.remove(level, farmer);
+        smith.discard();
+        farmer.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void merchantRestocksFromAPhysicalBarrel(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos lectern = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos storagePosition = helper.absolutePos(new BlockPos(4, 1, 1));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.LECTERN);
+        helper.setBlock(new BlockPos(4, 1, 1), Blocks.BARREL);
+        Container barrel = (Container) level.getBlockEntity(storagePosition);
+        helper.assertTrue(barrel != null, "O barril comercial não foi criado");
+        barrel.setItem(0, new ItemStack(Items.BREAD, 8));
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Mercado", lectern,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addStorage(storagePosition);
+        ResidentEntity merchant = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 1));
+        merchant.getProfessionData().assign(NpcProfession.MERCHANT, lectern, level.dimension().location());
+        WorkOrder order = MerchantManager.createOrder(level, settlement, storagePosition, Items.BREAD, 8);
+        helper.assertTrue(order != null && MerchantManager.canPerform(level, settlement, merchant, order),
+                "O estoque físico não gerou uma ordem válida para o comerciante");
+        helper.assertTrue(MerchantManager.reserveStock(level, settlement, order),
+                "A mercadoria não foi reservada para a ordem comercial");
+        helper.assertTrue(MerchantManager.restock(level, settlement, merchant, order)
+                        == MerchantManager.WorkResult.COMPLETED,
+                "O comerciante não retirou a mercadoria do armazém");
+        helper.assertTrue(new SettlementStorage(level, settlement).count(Items.BREAD) == 0
+                        && merchant.getTradeInventory().countItem(Items.BREAD) == 8,
+                "O reabastecimento duplicou ou perdeu mercadorias");
+        ProfessionService.remove(level, merchant);
+        merchant.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void guardPatrolsARegisteredPhysicalMarker(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos point = helper.absolutePos(new BlockPos(4, 1, 4));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.BELL);
+        helper.setBlock(new BlockPos(4, 1, 4), ModBlocks.PATROL_MARKER.get());
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Muralha", point,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addPatrolPosition(point);
+        ResidentEntity guard = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(3, 1, 4));
+        guard.getProfessionData().assign(NpcProfession.GUARD, station, level.dimension().location());
+        guard.getNpcInventory().addItem(new ItemStack(Items.IRON_SWORD));
+        WorkOrder order = GuardManager.createOrderAt(level, settlement, point);
+        helper.assertTrue(order != null && GuardManager.canPerform(level, settlement, guard, order),
+                "O marcador registrado não gerou uma patrulha válida");
+        helper.assertTrue(GuardManager.patrol(level, settlement, guard, order)
+                        == GuardManager.WorkResult.COMPLETED,
+                "O guarda não verificou o ponto de patrulha");
+        ProfessionService.remove(level, guard);
+        guard.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void hunterFiresARealArrowAtASafePopulation(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos storagePosition = helper.absolutePos(new BlockPos(2, 1, 5));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.FLETCHING_TABLE);
+        helper.setBlock(new BlockPos(2, 1, 5), Blocks.BARREL);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Campo de Caça",
+                helper.absolutePos(new BlockPos(4, 1, 4)), level.dimension(), 20, level.getGameTime());
+        settlement.addStorage(storagePosition);
+        Container arrowBarrel = (Container) level.getBlockEntity(storagePosition);
+        helper.assertTrue(arrowBarrel != null, "O barril de flechas não foi criado");
+        arrowBarrel.setItem(0, new ItemStack(Items.ARROW, HuntingManager.ARROWS_PER_ORDER));
+        List<Cow> herd = new ArrayList<>();
+        for (int i = 0; i < HuntingManager.MIN_POPULATION; i++) {
+            herd.add(spawnWildCow(helper, new BlockPos(5 + i, 1, 3)));
+        }
+        ResidentEntity hunter = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(3, 1, 3));
+        hunter.getProfessionData().assign(NpcProfession.HUNTER, station, level.dimension().location());
+        hunter.getNpcInventory().addItem(new ItemStack(Items.BOW));
+
+        WorkOrder order = HuntingManager.createOrderFor(level, settlement, herd.get(0));
+        helper.assertTrue(order != null, "Uma população segura não gerou ordem de caça");
+        helper.assertTrue(HuntingManager.collectAmmunition(level, settlement, hunter, order),
+                "O caçador não retirou as flechas físicas do armazém");
+        helper.assertTrue(new SettlementStorage(level, settlement).count(Items.ARROW) == 0
+                        && hunter.getNpcInventory().countItem(Items.ARROW) == HuntingManager.ARROWS_PER_ORDER,
+                "A transferência de flechas duplicou ou perdeu munição");
+        helper.assertTrue(ProfessionService.produce(hunter) == ProfessionService.ProductionResult.NO_RECIPE,
+                "O caminho abstrato do caçador ainda transforma flechas em recursos");
+        helper.assertTrue(HuntingManager.hunt(level, settlement, hunter, order)
+                        == HuntingManager.WorkResult.IN_PROGRESS,
+                "O caçador não iniciou o ataque físico");
+        helper.assertTrue(hunter.getNpcInventory().countItem(Items.ARROW)
+                        == HuntingManager.ARROWS_PER_ORDER - 1,
+                "O disparo não consumiu uma flecha real");
+        helper.assertTrue(hunter.getNpcInventory().getItem(0).getDamageValue() == 1,
+                "O arco não perdeu durabilidade");
+        helper.assertTrue(!level.getEntitiesOfClass(Arrow.class,
+                        hunter.getBoundingBox().inflate(16.0D)).isEmpty(),
+                "Nenhum projétil real foi criado");
+        herd.get(0).discard();
+        hunter.setTarget(null);
+        level.addFreshEntity(new ItemEntity(level, hunter.getX(), hunter.getY(), hunter.getZ(),
+                new ItemStack(Items.BEEF, 2)));
+        helper.assertTrue(HuntingManager.hunt(level, settlement, hunter, order)
+                        == HuntingManager.WorkResult.COMPLETED,
+                "O caçador não recolheu os drops físicos depois de perder a referência do alvo morto");
+        helper.assertTrue(hunter.getNpcInventory().countItem(Items.BEEF) == 2,
+                "Os drops da caça não chegaram ao inventário do caçador");
+        ProfessionService.remove(level, hunter);
+        hunter.discard();
+        for (Cow cow : herd) cow.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void hunterProtectsSmallPopulationsAndYoungAnimals(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Reserva",
+                helper.absolutePos(new BlockPos(4, 1, 4)), level.dimension(), 20, level.getGameTime());
+        List<Cow> herd = new ArrayList<>();
+        for (int i = 0; i < HuntingManager.MIN_POPULATION - 1; i++) {
+            herd.add(spawnWildCow(helper, new BlockPos(4 + i, 1, 3)));
+        }
+        Cow calf = spawnWildCow(helper, new BlockPos(8, 1, 3));
+        calf.setAge(-24000);
+        helper.assertTrue(HuntingManager.createOrderFor(level, settlement, herd.get(0)) == null,
+                "O filhote foi contado como adulto e permitiu reduzir demais o rebanho");
+        herd.add(spawnWildCow(helper, new BlockPos(9, 1, 3)));
+        helper.assertTrue(HuntingManager.createOrderFor(level, settlement, calf) == null,
+                "Um filhote foi escolhido como alvo de caça");
+        for (Cow cow : herd) cow.discard();
+        calf.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void fishermanUsesRealWaterAndVanillaFishingLoot(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos bank = helper.absolutePos(new BlockPos(2, 1, 3));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.BARREL);
+        helper.setBlock(new BlockPos(2, 0, 3), Blocks.STONE);
+        for (int x = 3; x <= 5; x++) {
+            for (int z = 2; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.WATER);
+            }
+        }
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Vila dos Pescadores", bank,
+                level.dimension(), 16, level.getGameTime());
+        ResidentEntity fisherman = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 2));
+        fisherman.getProfessionData().assign(NpcProfession.FISHERMAN, station, level.dimension().location());
+        fisherman.getNpcInventory().addItem(new ItemStack(Items.FISHING_ROD));
+
+        WorkOrder order = FishingManager.createOrderAt(level, settlement, bank);
+        helper.assertTrue(order != null, "A margem com água real não gerou ordem de pesca");
+        helper.assertTrue(ProfessionService.produce(fisherman) == ProfessionService.ProductionResult.NO_RECIPE,
+                "O caminho abstrato do pescador ainda cria peixes");
+        int before = inventoryItemCount(fisherman.getNpcInventory());
+        helper.assertTrue(FishingManager.fish(level, settlement, fisherman, order)
+                        == FishingManager.WorkResult.COMPLETED,
+                "O pescador não obteve loot pela tabela vanilla de pesca");
+        helper.assertTrue(inventoryItemCount(fisherman.getNpcInventory()) > before,
+                "A captura física não chegou ao inventário do pescador");
+        helper.assertTrue(fisherman.getNpcInventory().getItem(0).getDamageValue() == 1,
+                "A vara de pesca não perdeu durabilidade");
+        fisherman.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void fishermanRejectsAnArtificialSingleWaterBlock(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos bank = helper.absolutePos(new BlockPos(2, 1, 3));
+        helper.setBlock(new BlockPos(2, 0, 3), Blocks.STONE);
+        helper.setBlock(new BlockPos(3, 0, 3), Blocks.STONE);
+        helper.setBlock(new BlockPos(3, 1, 3), Blocks.WATER);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Poça", bank,
+                level.dimension(), 16, level.getGameTime());
+        helper.assertTrue(FishingManager.createOrderAt(level, settlement, bank) == null,
+                "Uma poça de um bloco foi aceita como ponto de pesca");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void cookTurnsStoredWheatIntoDepositableBread(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos storagePosition = helper.absolutePos(new BlockPos(5, 1, 4));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.SMOKER);
+        helper.setBlock(new BlockPos(5, 1, 4), Blocks.BARREL);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Cozinha", station,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addStorage(storagePosition);
+        Container barrel = (Container) level.getBlockEntity(storagePosition);
+        helper.assertTrue(barrel != null, "O barril da cozinha não foi criado");
+        barrel.setItem(0, new ItemStack(Items.WHEAT, 6));
+        ResidentEntity cook = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 1));
+        cook.getProfessionData().assign(NpcProfession.COOK, station, level.dimension().location());
+        cook.getNpcInventory().addItem(new ItemStack(ModItems.COOK_LADLE.get()));
+
+        WorkOrder order = CookingManager.createOrderAt(level, settlement, station);
+        helper.assertTrue(order != null, "O trigo armazenado não gerou ordem de cozinha");
+        helper.assertTrue(ProfessionService.produce(cook) == ProfessionService.ProductionResult.NO_RECIPE,
+                "O caminho abstrato do cozinheiro ainda produz comida");
+        helper.assertTrue(CookingManager.collectIngredients(level, settlement, cook, order),
+                "O cozinheiro não retirou o trigo físico do armazém");
+        helper.assertTrue(new SettlementStorage(level, settlement).count(Items.WHEAT) == 3
+                        && cook.getNpcInventory().countItem(Items.WHEAT) == CookingManager.WHEAT_PER_BREAD,
+                "A transferência do trigo duplicou ou perdeu ingredientes");
+        helper.assertTrue(CookingManager.prepareMeal(level, settlement, cook, order)
+                        == CookingManager.WorkResult.COMPLETED,
+                "O cozinheiro não preparou pão com ingredientes físicos");
+        helper.assertTrue(new SettlementStorage(level, settlement).count(Items.WHEAT) == 3,
+                "A cozinha não consumiu exatamente três trigos reais");
+        helper.assertTrue(cook.getNpcInventory().countItem(Items.BREAD) == 1,
+                "O pão produzido não chegou ao inventário do cozinheiro");
+        helper.assertTrue(cook.getNpcInventory().getItem(0).getDamageValue() == 1,
+                "O utensílio não perdeu durabilidade");
+
+        cook.getNpcInventory().addItem(new ItemStack(Items.BREAD, 4));
+        SettlementStorage storage = new SettlementStorage(level, settlement);
+        helper.assertTrue(storage.depositExcess(cook) == 3,
+                "O excedente de comida não foi depositado");
+        helper.assertTrue(storage.count(Items.BREAD) == 3
+                        && cook.getNpcInventory().countItem(Items.BREAD) == SettlementStorage.PERSONAL_FOOD_RESERVE,
+                "A reserva pessoal de comida não foi preservada");
+        ProfessionService.remove(level, cook);
+        cook.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void minerBreaksARealAuthorizedBlock(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos marker = helper.absolutePos(new BlockPos(2, 1, 4));
+        BlockPos target = helper.absolutePos(new BlockPos(5, 1, 4));
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.BLAST_FURNACE);
+        helper.setBlock(new BlockPos(2, 1, 4), ModBlocks.WORK_MARKER.get());
+        helper.setBlock(new BlockPos(4, 0, 4), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 0, 4), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 1, 4), Blocks.STONE);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Pedreira", target,
+                level.dimension(), 16, level.getGameTime());
+        settlement.addWorkPosition(marker);
+        ResidentEntity miner = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(3, 1, 4));
+        miner.getProfessionData().assign(NpcProfession.MINER, station, level.dimension().location());
+        miner.getNpcInventory().addItem(new ItemStack(Items.IRON_PICKAXE));
+
+        WorkOrder order = MiningManager.createOrderAt(level, settlement, target);
+        helper.assertTrue(order != null, "O bloco autorizado não gerou uma ordem física de mineração");
+        helper.assertTrue(ProfessionService.produce(miner) == ProfessionService.ProductionResult.NO_RECIPE,
+                "O caminho abstrato do minerador ainda produz recursos");
+        helper.assertTrue(MiningManager.workBlock(level, settlement, miner, order)
+                        == MiningManager.WorkResult.COMPLETED,
+                "O minerador não concluiu a quebra do bloco físico");
+        helper.assertTrue(level.getBlockState(target).isAir(), "O bloco físico não foi removido");
+        helper.assertTrue(miner.getNpcInventory().countItem(Items.COBBLESTONE) == 1,
+                "O drop real de pedregulho não chegou ao inventário");
+        helper.assertTrue(miner.getNpcInventory().getItem(0).getDamageValue() == 1,
+                "A picareta não perdeu durabilidade");
+        miner.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void minerRejectsBlocksWithoutAWorkMarker(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos target = helper.absolutePos(new BlockPos(5, 1, 4));
+        helper.setBlock(new BlockPos(4, 0, 4), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 0, 4), Blocks.STONE);
+        helper.setBlock(new BlockPos(5, 1, 4), Blocks.STONE);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Pedreira", target,
+                level.dimension(), 16, level.getGameTime());
+        helper.assertTrue(MiningManager.createOrderAt(level, settlement, target) == null,
+                "O minerador tentou quebrar um bloco fora de uma área autorizada");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void farmerHarvestsAndReplantsRealWheat(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos cropPosition = helper.absolutePos(new BlockPos(4, 1, 4));
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        CropBlock wheat = (CropBlock) Blocks.WHEAT;
+        helper.setBlock(new BlockPos(4, 0, 4), Blocks.FARMLAND);
+        helper.setBlock(new BlockPos(4, 1, 3), Blocks.GLOWSTONE);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.COMPOSTER);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Plantação", cropPosition,
+                level.dimension(), 16, level.getGameTime());
+        ResidentEntity farmer = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 4));
+        farmer.getProfessionData().assign(NpcProfession.FARMER, station, level.dimension().location());
+        farmer.getNpcInventory().addItem(new ItemStack(Items.IRON_HOE));
+        farmer.getNpcInventory().addItem(new ItemStack(Items.WHEAT_SEEDS));
+
+        helper.runAfterDelay(2, () -> {
+            helper.setBlock(new BlockPos(4, 1, 4), wheat.getStateForAge(wheat.getMaxAge()));
+            WorkOrder order = FarmingManager.createOrderAt(level, settlement, cropPosition);
+            helper.assertTrue(order != null, "O trigo maduro não gerou uma ordem física");
+            helper.assertTrue(ProfessionService.produce(farmer) == ProfessionService.ProductionResult.NO_RECIPE,
+                    "O caminho abstrato do fazendeiro ainda produz trigo");
+            FarmingManager.WorkResult farmingResult = FarmingManager.workCrop(level, settlement, farmer, order);
+            helper.assertTrue(farmingResult == FarmingManager.WorkResult.COMPLETED,
+                    "O fazendeiro não concluiu a colheita física: " + farmingResult);
+            helper.assertTrue(level.getBlockState(cropPosition).is(Blocks.WHEAT)
+                            && wheat.getAge(level.getBlockState(cropPosition)) == 0,
+                    "O trigo não foi replantado no estágio inicial");
+            helper.assertTrue(farmer.getNpcInventory().countItem(Items.WHEAT) > 0,
+                    "A colheita real não entregou trigo ao inventário");
+            helper.assertTrue(farmer.getNpcInventory().getItem(0).getDamageValue() == 1,
+                    "A enxada não perdeu durabilidade na colheita");
+            farmer.discard();
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty")
+    public static void farmerRejectsImmatureWheat(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos cropPosition = helper.absolutePos(new BlockPos(4, 1, 4));
+        helper.setBlock(new BlockPos(4, 0, 4), Blocks.FARMLAND);
+        helper.setBlock(new BlockPos(4, 1, 4), Blocks.WHEAT);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Plantação", cropPosition,
+                level.dimension(), 16, level.getGameTime());
+        helper.assertTrue(FarmingManager.createOrderAt(level, settlement, cropPosition) == null,
+                "O fazendeiro tentou colher trigo ainda imaturo");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void lumberjackHarvestsRealLogsAndReplants(GameTestHelper helper) {
+        buildOakTree(helper, false);
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(4, 1, 4));
+        BlockPos station = helper.absolutePos(new BlockPos(1, 1, 1));
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.CRAFTING_TABLE);
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Bosque", base,
+                level.dimension(), 16, level.getGameTime());
+        ResidentEntity lumberjack = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(2, 1, 4));
+        lumberjack.getProfessionData().assign(NpcProfession.LUMBERJACK, station, level.dimension().location());
+        lumberjack.getNpcInventory().addItem(new ItemStack(Items.IRON_AXE));
+        lumberjack.getNpcInventory().addItem(new ItemStack(Items.OAK_SAPLING));
+
+        WorkOrder order = ForestryManager.createOrderAt(level, settlement, base);
+        helper.assertTrue(order != null, "A árvore natural não gerou uma ordem física");
+        helper.assertTrue(ProfessionService.produce(lumberjack) == ProfessionService.ProductionResult.NO_RECIPE,
+                "O caminho abstrato do lenhador ainda produz madeira");
+        ForestryManager.WorkResult result = ForestryManager.WorkResult.IN_PROGRESS;
+        int steps = 0;
+        while (result == ForestryManager.WorkResult.IN_PROGRESS && steps++ < 8) {
+            result = ForestryManager.workTree(level, settlement, lumberjack, order);
+        }
+        helper.assertTrue(result == ForestryManager.WorkResult.COMPLETED,
+                "O lenhador não concluiu o corte gradual da árvore");
+        helper.assertTrue(lumberjack.getNpcInventory().countItem(Items.OAK_LOG) == 6,
+                "As toras físicas não foram recolhidas exatamente uma vez");
+        helper.assertTrue(level.getBlockState(base).is(Blocks.OAK_SAPLING),
+                "A muda física disponível não foi replantada");
+        helper.assertTrue(lumberjack.getNpcInventory().getItem(0).getDamageValue() == 6,
+                "O machado não perdeu durabilidade por cada tronco cortado");
+        lumberjack.discard();
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void lumberjackRejectsLogsAttachedToAConstruction(GameTestHelper helper) {
+        buildOakTree(helper, true);
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(4, 1, 4));
+        Settlement settlement = new Settlement(UUID.randomUUID(), "Proteção", base,
+                level.dimension(), 16, level.getGameTime());
+        helper.assertTrue(ForestryManager.inspectTree(level, settlement, base) == null,
+                "O lenhador confundiu uma estrutura de madeira com árvore natural");
+        helper.succeed();
+    }
 
     @GameTest(template = "empty")
     public static void hostileMobAcquiresResidentAsCombatTarget(GameTestHelper helper) {
@@ -281,6 +779,8 @@ public final class SettlementGameTests {
         }
         BlockPos relativeStorage = new BlockPos(4, 1, 1);
         helper.setBlock(relativeStorage, Blocks.BARREL);
+        BlockPos builderStation = helper.absolutePos(new BlockPos(5, 1, 1));
+        helper.setBlock(new BlockPos(5, 1, 1), Blocks.STONECUTTER);
         BlockPos storagePosition = helper.absolutePos(relativeStorage);
         Container barrel = (Container) helper.getLevel().getBlockEntity(storagePosition);
         helper.assertTrue(barrel != null, "O barril de materiais não foi criado");
@@ -298,14 +798,21 @@ public final class SettlementGameTests {
         project.setStage(ConstructionStage.WAITING_RESOURCES);
         settlement.addProject(project);
 
+        ResidentEntity builder = helper.spawn(ModEntityTypes.RESIDENT.get(), new BlockPos(4, 1, 3));
+        builder.getProfessionData().assign(NpcProfession.BUILDER, builderStation,
+                helper.getLevel().dimension().location());
+        builder.getNpcInventory().addItem(new ItemStack(ModItems.BUILDER_HAMMER.get()));
         ConstructionManager.WorkResult result = ConstructionManager.workProject(
-                helper.getLevel(), settlement, null);
+                helper.getLevel(), settlement, builder);
         helper.assertTrue(result == ConstructionManager.WorkResult.IN_PROGRESS,
                 "A obra deveria iniciar com todos os materiais disponíveis");
         helper.assertTrue(project.blockIndex() > 0 && project.blockIndex() <= ConstructionManager.BLOCKS_PER_WORK_CYCLE,
                 "A obra colocou blocos demais em um ciclo");
         helper.assertTrue(new SettlementStorage(helper.getLevel(), settlement).count(Items.COBBLESTONE) == 7,
                 "Os blocos colocados não consumiram materiais físicos");
+        helper.assertTrue(builder.getNpcInventory().getItem(0).getDamageValue() == 2,
+                "O martelo do construtor não perdeu durabilidade por bloco colocado");
+        builder.discard();
         helper.succeed();
     }
 
@@ -456,6 +963,21 @@ public final class SettlementGameTests {
         helper.succeed();
     }
 
+    private static int inventoryItemCount(Container inventory) {
+        int count = 0;
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) count += inventory.getItem(slot).getCount();
+        return count;
+    }
+
+    private static Cow spawnWildCow(GameTestHelper helper, BlockPos relativePosition) {
+        Cow cow = EntityType.COW.create(helper.getLevel());
+        if (cow == null) throw new IllegalStateException("Não foi possível criar a vaca de teste");
+        BlockPos position = helper.absolutePos(relativePosition);
+        cow.moveTo(position.getX() + 0.5D, position.getY(), position.getZ() + 0.5D, 0.0F, 0.0F);
+        helper.getLevel().addFreshEntity(cow);
+        return cow;
+    }
+
     private static void buildClosedHome(GameTestHelper helper) {
         for (int x = 1; x <= 7; x++) for (int z = 1; z <= 7; z++) {
             helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
@@ -476,5 +998,21 @@ public final class SettlementGameTests {
         helper.setBlock(new BlockPos(4, 1, 5), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.FACING, Direction.SOUTH).setValue(BedBlock.PART, BedPart.HEAD));
         helper.setBlock(new BlockPos(3, 1, 3), ModBlocks.CRADLE.get());
+    }
+
+    private static void buildOakTree(GameTestHelper helper, boolean attachPlanks) {
+        helper.setBlock(new BlockPos(4, 0, 4), Blocks.DIRT);
+        helper.setBlock(new BlockPos(4, 1, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(4, 2, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(4, 3, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(4, 4, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(4, 5, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(4, 6, 4), Blocks.OAK_LOG);
+        helper.setBlock(new BlockPos(3, 6, 4), Blocks.OAK_LEAVES);
+        helper.setBlock(new BlockPos(5, 6, 4), Blocks.OAK_LEAVES);
+        helper.setBlock(new BlockPos(4, 6, 3), Blocks.OAK_LEAVES);
+        helper.setBlock(new BlockPos(4, 6, 5), Blocks.OAK_LEAVES);
+        helper.setBlock(new BlockPos(4, 7, 4), Blocks.OAK_LEAVES);
+        if (attachPlanks) helper.setBlock(new BlockPos(5, 1, 4), Blocks.OAK_PLANKS);
     }
 }

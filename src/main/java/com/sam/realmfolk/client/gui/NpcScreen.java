@@ -18,7 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 public final class NpcScreen extends AbstractContainerScreen<NpcMenu> {
-    private static final ResourceLocation FRAME = new ResourceLocation(
+    private static final ResourceLocation FRAME = ResourceLocation.fromNamespaceAndPath(
             Realmfolk.MODID, "textures/gui/npc_menu_frame.png");
     private static final int TEXTURE_WIDTH = 1672;
     private static final int TEXTURE_HEIGHT = 941;

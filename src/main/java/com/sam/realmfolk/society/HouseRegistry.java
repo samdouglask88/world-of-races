@@ -28,7 +28,7 @@ public final class HouseRegistry {
     }
 
     private static House house(String path, String surname) {
-        return new House(new ResourceLocation(Realmfolk.MODID, path), surname);
+        return new House(ResourceLocation.fromNamespaceAndPath(Realmfolk.MODID, path), surname);
     }
 
     public static House randomHumanHouse() {

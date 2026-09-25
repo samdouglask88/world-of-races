@@ -189,7 +189,7 @@ public final class PersonData {
 
     public static PersonData load(CompoundTag tag) {
         ResourceLocation houseId = tag.contains("HouseId")
-                ? new ResourceLocation(tag.getString("HouseId")) : null;
+                ? ResourceLocation.tryParse(tag.getString("HouseId")) : null;
         PersonData person = new PersonData(
                 tag.getUUID("PersonId"),
                 tag.getString("FirstName"),

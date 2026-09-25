@@ -16,11 +16,11 @@ final class NpcEquipmentSlot extends Slot {
     private final ResidentEntity npc;
     private final EquipmentSlot equipmentSlot;
 
-    private static final ResourceLocation EMPTY_HELMET = new ResourceLocation("item/empty_armor_slot_helmet");
-    private static final ResourceLocation EMPTY_CHESTPLATE = new ResourceLocation("item/empty_armor_slot_chestplate");
-    private static final ResourceLocation EMPTY_LEGGINGS = new ResourceLocation("item/empty_armor_slot_leggings");
-    private static final ResourceLocation EMPTY_BOOTS = new ResourceLocation("item/empty_armor_slot_boots");
-    private static final ResourceLocation EMPTY_SHIELD = new ResourceLocation("item/empty_armor_slot_shield");
+    private static final ResourceLocation EMPTY_HELMET = ResourceLocation.withDefaultNamespace("item/empty_armor_slot_helmet");
+    private static final ResourceLocation EMPTY_CHESTPLATE = ResourceLocation.withDefaultNamespace("item/empty_armor_slot_chestplate");
+    private static final ResourceLocation EMPTY_LEGGINGS = ResourceLocation.withDefaultNamespace("item/empty_armor_slot_leggings");
+    private static final ResourceLocation EMPTY_BOOTS = ResourceLocation.withDefaultNamespace("item/empty_armor_slot_boots");
+    private static final ResourceLocation EMPTY_SHIELD = ResourceLocation.withDefaultNamespace("item/empty_armor_slot_shield");
 
     NpcEquipmentSlot(ResidentEntity npc, EquipmentSlot equipmentSlot, int x, int y) {
         super(EMPTY_CONTAINER, 0, x, y);

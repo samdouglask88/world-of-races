@@ -18,7 +18,7 @@ import net.minecraft.world.item.Items;
 import java.util.List;
 
 public final class FamilyTreeScreen extends AbstractContainerScreen<FamilyTreeMenu> {
-    private static final ResourceLocation FRAME = new ResourceLocation(
+    private static final ResourceLocation FRAME = ResourceLocation.fromNamespaceAndPath(
             Realmfolk.MODID, "textures/gui/family_tree_frame.png");
     private static final int TEXTURE_WIDTH = 1671;
     private static final int TEXTURE_HEIGHT = 941;

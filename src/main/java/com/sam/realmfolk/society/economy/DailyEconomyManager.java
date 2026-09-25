@@ -27,7 +27,6 @@ import net.minecraft.world.phys.AABB;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public final class DailyEconomyManager {
@@ -52,20 +51,16 @@ public final class DailyEconomyManager {
         int threats = level.getEntitiesOfClass(Monster.class,
                 AABB.ofSize(settlement.center().getCenter(), settlement.radius() * 2.0D, 64.0D,
                         settlement.radius() * 2.0D), Entity::isAlive).size();
-        Set<NpcProfession> activeProfessions = new HashSet<>();
-
         for (UUID personId : settlement.memberIds()) {
             ResidentEntity resident = loaded(level, society.getPerson(personId).orElse(null));
             if (resident == null || !resident.isWorkingAge()) continue;
             NpcProfession profession = resident.getProfessionData().profession();
             if (profession == NpcProfession.NONE) unemployed++;
-            else activeProfessions.add(profession);
             if (profession != NpcProfession.NONE && !ProfessionService.hasRequiredTool(resident)) missingTools++;
         }
 
         updatePriorities(settlement, population, food, balanceBefore, missingTools, threats);
-        createMissingOrders(level, settlement, food, missingTools,
-                activeProfessions.contains(NpcProfession.BLACKSMITH));
+        createMissingOrders(level, settlement, food, missingTools);
         ConstructionManager.evaluateStorageNeed(level, settlement);
         ConstructionManager.ensureBuildOrder(level, settlement);
         ReproductionManager.dailyUpdate(level, settlement);
@@ -105,8 +100,7 @@ public final class DailyEconomyManager {
         settlement.government().setPriority(SettlementPolicy.WEALTH, treasury < 16 ? 80 : 45);
     }
 
-    private static void createMissingOrders(ServerLevel level, Settlement settlement, int food, int missingTools,
-                                            boolean hasBlacksmith) {
+    private static void createMissingOrders(ServerLevel level, Settlement settlement, int food, int missingTools) {
         long now = level.getGameTime();
         if (food < Math.max(16, settlement.memberIds().size() * 6) && !hasOpen(settlement, WorkOrderType.FETCH_FOOD)) {
             settlement.taskBoard().add(new WorkOrder(UUID.randomUUID(), WorkOrderType.FETCH_FOOD,
@@ -117,11 +111,6 @@ public final class DailyEconomyManager {
             settlement.taskBoard().add(new WorkOrder(UUID.randomUUID(), WorkOrderType.FETCH_TOOL,
                     settlement.government().priority(SettlementPolicy.PRODUCTION), settlement.id(), null, level.dimension(),
                     Items.AIR, 1, Items.AIR, 0, now, now + DAY_TICKS));
-        }
-        if (hasBlacksmith && !hasOpen(settlement, WorkOrderType.PRODUCE_RESOURCE)) {
-            settlement.taskBoard().add(new WorkOrder(UUID.randomUUID(), WorkOrderType.PRODUCE_RESOURCE,
-                    settlement.government().priority(SettlementPolicy.PRODUCTION), settlement.id(), null, level.dimension(),
-                    Items.IRON_INGOT, 2, Items.IRON_SWORD, 1, now, now + DAY_TICKS * 2));
         }
     }
 

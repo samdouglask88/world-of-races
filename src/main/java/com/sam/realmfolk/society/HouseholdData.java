@@ -74,7 +74,7 @@ public final class HouseholdData {
     public static HouseholdData load(CompoundTag tag) {
         String houseKey = tag.contains("PrimaryHouseId") ? "PrimaryHouseId" : "HouseId";
         ResourceLocation primaryHouseId = tag.contains(houseKey)
-                ? new ResourceLocation(tag.getString(houseKey)) : null;
+                ? ResourceLocation.tryParse(tag.getString(houseKey)) : null;
         HouseholdData household = new HouseholdData(
                 tag.getUUID("HouseholdId"), primaryHouseId,
                 tag.hasUUID("SpouseAId") ? tag.getUUID("SpouseAId") : null,
